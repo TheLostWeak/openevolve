@@ -1,0 +1,152 @@
+## Context (for reference only)
+
+Performance metrics, prior attempts, and artifacts are provided for reference only.
+Do NOT explain them. Do NOT restate them.
+
+{metrics}
+{improvement_areas}
+{artifacts}
+{evolution_history}
+
+---
+
+## Current Program
+
+```{language}
+{current_program}
+```
+
+---
+
+## TASK (DO EXACTLY THIS)
+
+Return a COMPLETE replacement of the program source file.
+
+The program MUST define:
+
+```
+def get_C():
+```
+
+and MUST return a NON-EMPTY Python list of points.
+
+Each point:
+
+* is a list or tuple
+* has EXACTLY 11 coordinates
+* ALL coordinates are EXACT INTEGERS
+
+---
+
+## OBJECTIVE (ABSOLUTE PRIORITY)
+
+Maximize |C|, the number of points returned by `get_C()`.
+
+If ANY constraint is violated, the solution is considered INVALID.
+A smaller VALID set is ALWAYS better than a larger INVALID one.
+
+---
+
+## HARD CONSTRAINTS (NO EXCEPTIONS)
+
+### C0 - Integer-only geometry
+
+* Every coordinate MUST be an integer literal.
+* Floating-point numbers, fractions, or computed normals are FORBIDDEN.
+
+### C1 - Origin exclusion
+
+* The zero vector (0,0,0,0,0,0,0,0,0,0,0) MUST NOT appear in C.
+
+### C2 - Distance domination constraint
+
+Let ||x|| denote the Euclidean norm.
+Define max_norm as the maximum norm over C:
+
+```
+max_norm = max(||x|| for x in C)
+```
+
+For EVERY pair of DISTINCT points x != y in C, it MUST hold that:
+
+```
+||x - y|| >= max_norm
+```
+
+This condition is GLOBAL and applies to ALL pairs.
+
+Attempting to evade this constraint by scaling, symmetry tricks,
+or post-hoc normalization will be treated as INVALID.
+
+---
+
+## OUTPUT FORMAT (PREFERRED — RELAXED FOR ROBUSTNESS)
+
+- Preferred: Return a single fenced Python code block containing a valid module that defines `def get_C():` and returns the required data.
+    - The preferred opening fence is three backticks followed by `python` and a newline: ```python
+    - The preferred closing fence is three backticks on its own line: ```
+- Robustness: If the model includes a short human-readable explanation immediately before or after the code block, or uses simple Python expressions (for example `[1] + [0] * 10` or small constant expressions) that evaluate to integer literals at runtime, that is acceptable for this template. The system will attempt to extract and evaluate simple expressions if safe.
+- The code should remain importable (no interactive input required). Avoid external network calls or writing files. Small explanatory comments inside the code block are acceptable.
+
+Note: This template prefers the strict single-block form but tolerates minor surrounding text or simple expressions to improve robustness across model outputs.
+
+---
+
+## STRATEGY GUIDANCE (DO NOT IGNORE)
+
+* Think in terms of discrete geometry and combinatorial constructions.
+* Validity is binary. Do not guess. Do not approximate.
+* If unsure, return fewer points.
+* Important note about scaling and magnitude:
+    - Uniformly scaling every coordinate by the same factor does NOT change whether a set is valid or invalid: the distance constraint is scale-invariant. Multiplying all coordinates by a constant will multiply both `max_norm` and all pairwise distances by the same factor, leaving constraints unchanged.
+    - Nonetheless, using larger integer magnitudes increases the discrete set of available integer vectors at larger radii. In practice this provides the model more combinatorial choices to place MORE well-separated integer points.
+    - Therefore we STRONGLY recommend preferring constructions that use larger integer magnitudes (for example, include points with norms larger than 1,000,000,000,000) because this expands the search space in a way that can produce better scale-invariant packings.
+
+## RESPONSE SANITY CHECK (PREFERRED)
+
+Before replying, aim to satisfy as many of the following as possible. If the strict checks cannot be met, prefer a conservative valid solution and the system may perform a light extraction step to salvage the code:
+- The source defines `def get_C():` at top level.
+- `get_C()` returns a non-empty Python list (literal lists/tuples preferred). Simple expressions that evaluate to integer literals are acceptable.
+- Every point in the returned list should have 11 coordinates (integers preferred).
+- The origin (11 zeros) should not be present.
+
+If the model cannot safely meet all constraints, return a smaller but valid set rather than an invalid one. The system will attempt safe, automated extraction/cleanup if small deviations occur.
+
+---
+
+## FAILURE MODES (AUTOMATIC REJECTION)
+
+The output is INVALID if ANY of the following occur:
+
+* Any coordinate is non-integer.
+* Any point has length != 11.
+* The origin is included.
+* Any pair violates the distance condition.
+* Output includes more than one code block.
+* Output includes any text outside the code block.
+
+---
+
+## MINIMAL VALID EXAMPLE (NOT OPTIMAL)
+
+```python
+def get_C():
+    d = 11
+    return [
+        [1] + [0] * (d - 1),
+        [0, 1] + [0] * (d - 2),
+    ]
+```
+
+## LARGE-MAGNITUDE EXAMPLE (VALID, ILLUSTRATIVE)
+
+```python
+def get_C():
+    # Example using large integer magnitudes (literal integers)
+    return [
+        [1000000000000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1000000000000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+```
+
+Return ONLY the program source code.
