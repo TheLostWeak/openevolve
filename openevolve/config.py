@@ -97,7 +97,7 @@ class LLMConfig(LLMModelConfig):
     max_tokens: int = 4096
 
     # Request parameters
-    timeout: int = 60
+    timeout: int = 3600  # 1 hour
     retries: int = 3
     retry_delay: int = 5
 
@@ -288,6 +288,7 @@ class DatabaseConfig:
     population_size: int = 1000
     archive_size: int = 100
     num_islands: int = 5
+    programs_per_island: Optional[int] = None
 
     # Selection parameters
     elite_selection_ratio: float = 0.1
