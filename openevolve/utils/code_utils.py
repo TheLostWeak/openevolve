@@ -103,20 +103,32 @@ def parse_full_rewrite(llm_response: str, language: str = "python") -> Optional[
     Returns:
         Extracted code or None if not found
     """
-    code_block_pattern = r"```" + language + r"\n(.*?)```"
+    # Accept either LF or CRLF after the code fence and capture contents lazily
+    code_block_pattern = r"```" + language + r"\r?\n(.*?)```"
     matches = re.findall(code_block_pattern, llm_response, re.DOTALL)
 
     if matches:
         return matches[0].strip()
 
     # Fallback to any code block
-    code_block_pattern = r"```(.*?)```"
+    # Fallback: any fenced code block with optional language tag
+    code_block_pattern = r"```(?:\w+)?\r?\n(.*?)```"
     matches = re.findall(code_block_pattern, llm_response, re.DOTALL)
 
     if matches:
         return matches[0].strip()
 
-    # Fallback to plain text
+    # If no fenced block matched, try to strip surrounding triple-backticks
+    stripped = llm_response.strip()
+
+    # If there is a leading fence, remove it (handles missing closing fence too)
+    if stripped.startswith("```"):
+        inner = re.sub(r"^```(?:\w+)?\r?\n", "", stripped)
+        # Remove trailing fence if present
+        inner = re.sub(r"\r?\n```$", "", inner)
+        return inner.strip()
+
+    # Fallback to plain text (may still contain fences)
     return llm_response
 
 

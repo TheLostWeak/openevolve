@@ -40,28 +40,28 @@ Each point:
 
 ## OBJECTIVE (ABSOLUTE PRIORITY)
 
-Maximize |C|, the number of points returned by `get_C()`.
+Maximize |C|, the number of points returned by get_C().
 
-If ANY constraint is violated, the solution is considered INVALID.
+If ANY constraint is violated, the solution is INVALID.
 A smaller VALID set is ALWAYS better than a larger INVALID one.
 
 ---
 
 ## HARD CONSTRAINTS (NO EXCEPTIONS)
 
-### C0 - Integer-only geometry
+### C0: Integer-only geometry
 
 * Every coordinate MUST be an integer literal.
-* Floating-point numbers, fractions, or computed normals are FORBIDDEN.
+* Floating-point values, fractions, or computed values are FORBIDDEN.
 
-### C1 - Origin exclusion
+### C1: Origin exclusion
 
 * The zero vector (0,0,0,0,0,0,0,0,0,0,0) MUST NOT appear in C.
 
-### C2 - Distance domination constraint
+### C2: Global distance domination
 
 Let ||x|| denote the Euclidean norm.
-Define max_norm as the maximum norm over C:
+Define max_norm as:
 
 ```
 max_norm = max(||x|| for x in C)
@@ -75,42 +75,79 @@ For EVERY pair of DISTINCT points x != y in C, it MUST hold that:
 
 This condition is GLOBAL and applies to ALL pairs.
 
-Attempting to evade this constraint by scaling, symmetry tricks,
-or post-hoc normalization will be treated as INVALID.
+---
+
+## STRATEGY GUIDANCE (CRITICAL - READ CAREFULLY)
+
+This is a high-dimensional INTEGER feasibility problem.
+Do NOT assume spherical shells, angular separation, or uniform norms.
+
+Key facts implied by the constraints:
+
+* The distance constraint is equivalent to a squared-sum condition:
+
+  ```
+  for all x != y:
+      sum_i (x_i - y_i)^2 >= max_norm^2
+  ```
+
+  Large distances can be achieved by distributing squared differences
+  across MANY coordinates at once, not only by directional separation.
+
+* The value of max_norm may be determined by ONE or a very small number
+  of points. Most points in C do NOT need to have norm close to max_norm.
+
+* Valid solutions may be highly non-uniform, non-symmetric, and irregular.
+  Points do NOT need to form a clean geometric structure.
+  "Ugly but valid" integer constructions are acceptable and often superior.
+
+* Think in terms of combinatorial energy allocation in Z^11:
+  mixed signs, varied magnitudes, and multiple coordinates contributing
+  moderate differences whose squares sum to the required threshold.
+
+* Large integer magnitudes are useful because they allow finer-grained
+  allocation of squared differences under integer-only constraints,
+  not because of scaling or normalization.
+
+### SOTA HINTS (LEVERAGE KNOWN STRUCTURE)
+
+* A known high-quality set has **593 points** with:
+  - all norm R approximates 1e13 (all points nearly in a single sphere)
+  - min_pairwise approximates R (tight kissing condition)
+  - frequent angles: 60, 90, 120 degrees
+  - partial sign symmetry and near-zero centroid
+
+* Practical guidance:
+  - **Reuse or subset** points from the known set when unsure; even a large subset is valid.
+  - Keep norms roughly uniform (single radius) to satisfy the global constraint cleanly.
+  - Mix signs to keep centroid near the origin; avoid all-positive vectors.
+  - Prefer larger coordinates (e.g., around 1e12-1e13) to keep distances well above the threshold.
+  - Aim for a **large |C|** (e.g., larger than 100 if possible); avoid returning tiny sets unless necessary for validity.
+
+Avoid assuming:
+
+* a single spherical shell
+* angular or kissing-number intuition
+* sparsity or axis-aligned structure
+* symmetry or equal-radius designs
+
+Validity is binary. If unsure, return fewer points.
 
 ---
 
-## OUTPUT FORMAT (PREFERRED — RELAXED FOR ROBUSTNESS)
+## OUTPUT FORMAT (STRICT)
 
-- Preferred: Return a single fenced Python code block containing a valid module that defines `def get_C():` and returns the required data.
-    - The preferred opening fence is three backticks followed by `python` and a newline: ```python
-    - The preferred closing fence is three backticks on its own line: ```
-- Robustness: If the model includes a short human-readable explanation immediately before or after the code block, or uses simple Python expressions (for example `[1] + [0] * 10` or small constant expressions) that evaluate to integer literals at runtime, that is acceptable for this template. The system will attempt to extract and evaluate simple expressions if safe.
-- The code should remain importable (no interactive input required). Avoid external network calls or writing files. Small explanatory comments inside the code block are acceptable.
+Return ONLY a single fenced Python code block containing a valid module.
 
-Note: This template prefers the strict single-block form but tolerates minor surrounding text or simple expressions to improve robustness across model outputs.
+The module MUST:
 
----
+* define def get_C() at top level
+* return a non-empty Python list
+* use ONLY integer coordinates
+* NOT include the origin
+* include NO text outside the code block
 
-## STRATEGY GUIDANCE (DO NOT IGNORE)
-
-* Think in terms of discrete geometry and combinatorial constructions.
-* Validity is binary. Do not guess. Do not approximate.
-* If unsure, return fewer points.
-* Important note about scaling and magnitude:
-    - Uniformly scaling every coordinate by the same factor does NOT change whether a set is valid or invalid: the distance constraint is scale-invariant. Multiplying all coordinates by a constant will multiply both `max_norm` and all pairwise distances by the same factor, leaving constraints unchanged.
-    - Nonetheless, using larger integer magnitudes increases the discrete set of available integer vectors at larger radii. In practice this provides the model more combinatorial choices to place MORE well-separated integer points.
-    - Therefore we STRONGLY recommend preferring constructions that use larger integer magnitudes (for example, include points with norms larger than 1,000,000,000,000) because this expands the search space in a way that can produce better scale-invariant packings.
-
-## RESPONSE SANITY CHECK (PREFERRED)
-
-Before replying, aim to satisfy as many of the following as possible. If the strict checks cannot be met, prefer a conservative valid solution and the system may perform a light extraction step to salvage the code:
-- The source defines `def get_C():` at top level.
-- `get_C()` returns a non-empty Python list (literal lists/tuples preferred). Simple expressions that evaluate to integer literals are acceptable.
-- Every point in the returned list should have 11 coordinates (integers preferred).
-- The origin (11 zeros) should not be present.
-
-If the model cannot safely meet all constraints, return a smaller but valid set rather than an invalid one. The system will attempt safe, automated extraction/cleanup if small deviations occur.
+Any deviation results in INVALID output.
 
 ---
 
@@ -118,12 +155,12 @@ If the model cannot safely meet all constraints, return a smaller but valid set 
 
 The output is INVALID if ANY of the following occur:
 
-* Any coordinate is non-integer.
-* Any point has length != 11.
-* The origin is included.
-* Any pair violates the distance condition.
-* Output includes more than one code block.
-* Output includes any text outside the code block.
+* any coordinate is non-integer
+* any point has length != 11
+* the origin is included
+* any pair violates the distance constraint
+* more than one code block is present
+* any text appears outside the code block
 
 ---
 
@@ -131,21 +168,9 @@ The output is INVALID if ANY of the following occur:
 
 ```python
 def get_C():
-    d = 11
     return [
-        [1] + [0] * (d - 1),
-        [0, 1] + [0] * (d - 2),
-    ]
-```
-
-## LARGE-MAGNITUDE EXAMPLE (VALID, ILLUSTRATIVE)
-
-```python
-def get_C():
-    # Example using large integer magnitudes (literal integers)
-    return [
-        [1000000000000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1000000000000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ]
 ```
 

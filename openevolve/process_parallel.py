@@ -206,8 +206,14 @@ def _run_iteration_worker(
 
             diff_blocks = extract_diffs(llm_response, _worker_config.diff_pattern)
             if not diff_blocks:
+                logger.debug(
+                    "No diffs extracted from LLM response (truncated): %s",
+                    repr(llm_response)[:1000],
+                )
                 return SerializableResult(
-                    error=f"No valid diffs found in response", iteration=iteration
+                    error=f"No valid diffs found in response",
+                    llm_response=llm_response,
+                    iteration=iteration,
                 )
 
             child_code = apply_diff(parent.code, llm_response, _worker_config.diff_pattern)
@@ -217,8 +223,14 @@ def _run_iteration_worker(
 
             new_code = parse_full_rewrite(llm_response, _worker_config.language)
             if not new_code:
+                logger.debug(
+                    "No code extracted from LLM response (truncated): %s",
+                    repr(llm_response)[:1000],
+                )
                 return SerializableResult(
-                    error=f"No valid code found in response", iteration=iteration
+                    error=f"No valid code found in response",
+                    llm_response=llm_response,
+                    iteration=iteration,
                 )
 
             child_code = new_code
@@ -484,7 +496,13 @@ class ProcessParallelController:
                 result = future.result(timeout=timeout_seconds)
 
                 if result.error:
-                    logger.warning(f"Iteration {completed_iteration} error: {result.error}")
+                    # If worker included the raw LLM response, log a truncated version for debugging
+                    if getattr(result, "llm_response", None):
+                        logger.warning(
+                            f"Iteration {completed_iteration} error: {result.error} | LLM response (truncated): {repr(result.llm_response)[:1000]}"
+                        )
+                    else:
+                        logger.warning(f"Iteration {completed_iteration} error: {result.error}")
                 elif result.child_program_dict:
                     # Reconstruct program from dict
                     child_program = Program(**result.child_program_dict)
