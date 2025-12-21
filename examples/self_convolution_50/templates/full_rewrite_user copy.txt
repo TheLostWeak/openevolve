@@ -1,0 +1,80 @@
+You must reply with **valid Python source code only**.
+
+Produce a minimal, import-free Python module that defines a nonnegative step function on the interval [-1/4, 1/4] using exactly **50 equal-width bins**.
+
+**STRICT REQUIREMENTS**
+
+* Output only valid Python code. No explanations, comments, Markdown, or formatting.
+* Do NOT use triple backticks.
+* The module must define exactly one of the following:
+
+  * a function `get_steps()` returning a list of 50 nonnegative floats, **or**
+  * a top-level variable `steps` which is a list of 50 nonnegative floats.
+* The list must have length exactly 50.
+* All values must be finite, real, nonnegative numbers (no NaN or infinity).
+* Values should be reasonably scaled (suggested range: [0, 1000]).
+* No imports and no code with side effects at import time.
+
+**INTERPRETATION**
+
+* The 50 values represent the heights of a piecewise-constant function on 50 equal subintervals of [-1/4, 1/4], ordered from left to right.
+
+**GOAL**
+
+* For any function f, define the self-convolution of f as:
+
+  (f*f)(x) = \int f(t) f(x - t) dt
+
+* An external evaluator will compute the self-convolution f*f and evaluate
+
+  R(f) = L2sq / (L1 * Linf)
+
+  Here:
+
+  * L1 is the integral of f*f over its domain (sum of segment contributions),
+  * L2sq is the integral of (f*f)^2 over the domain,
+  * Linf is the maximum absolute value of f*f.
+
+* The evolutionary process aims to maximize R(f).
+
+**CURRENT PROGRAM (included verbatim for your reference)**
+
+```{language}
+{current_program}
+```
+
+**TASK — rewrite the current program**
+
+* Use the provided current program as the starting point.
+* Preserve the program's public interface: if it defines `steps` or `get_steps()`, keep that same name and signature.
+* Prefer minimal, targeted edits: primarily modify the 50 step values, not other parts of the code.
+* Do not add imports, runtime prompts, or unrelated code.
+* Output the entire Python module exactly; do not include extra text.
+
+**EVALUATOR FORMALISM (exact)**
+
+* Let n = 50. The evaluator constructs arrays `slopes[k]` and `intercepts[k]` of length `conv_len = 100`.
+
+* Each pair of step heights a_i, a_j contributes linearly to two unit intervals:
+
+  * Interval [i+j, i+j+1]: slope += a_i * a_j
+  * Interval [i+j+1, i+j+2]: slope -= a_i * a_j
+  * Intercepts are adjusted to maintain continuity
+
+* On each unit interval k (x in [0,1]), self-convolution is:
+
+  v_k(x) = slopes[k] * x + intercepts[k]
+
+* Per-segment contributions:
+
+  * L1: 0.5 * slopes[k] + intercepts[k]
+  * L2^2: slopes[k]^2 / 3 + slopes[k] * intercepts[k] + intercepts[k]^2
+  * L∞: max(abs(intercepts[k]), abs(slopes[k] + intercepts[k]))
+
+* Sum across k=0..99 to get L1, L2sq, Linf. Then compute R = L2sq / (L1 * Linf) if L1>0 and Linf>0, else 0.0.
+
+**INSTRUCTIONS**
+
+* Produce `steps` (or `get_steps()`) consistent with the exact rules above.
+* Length must be 50, values nonnegative, finite, and reasonably scaled.
+* Do not include any text, explanations, or formatting outside the Python code.

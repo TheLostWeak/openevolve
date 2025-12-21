@@ -1,5 +1,4 @@
 llm:
-  # Keep defaults or override to your provider. Prefer using environment variable for key.
   api_base: "https://openrouter.ai/api/v1"
   api_key: "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"
   models:
@@ -11,9 +10,14 @@ llm:
       weight: 1.0
 
 database:
+  db_path: "examples/self_convolution_50/openevolve_output/db"
+  log_prompts: true
   feature_dimensions:
     - "size"
     - "max_norm"
+    - "self_convolution_L1"
+    - "self_convolution_L2sq"
+    - "self_convolution_Linf"
   population_size: 200
   num_islands: 3
 
@@ -21,12 +25,9 @@ evaluator:
   timeout: 300
   cascade_evaluation: false
 
-# Use full-rewrite template for this problem to force the LLM
-# to return a complete program as a single Python code block.
 prompt:
-  template_dir: "examples/kissing_number_11/templates"
+  template_dir: "examples/self_convolution_50/templates"
 
-# Use full rewrites instead of diff-based evolution for this task.
 diff_based_evolution: false
 
 max_iterations: 100

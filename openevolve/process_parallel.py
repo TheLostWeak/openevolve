@@ -497,7 +497,29 @@ class ProcessParallelController:
 
                 if result.error:
                     # If worker included the raw LLM response, log a truncated version for debugging
+                    # If worker included the raw LLM response, persist it to disk for post-mortem
                     if getattr(result, "llm_response", None):
+                        try:
+                            # Attempt to write full LLM response to a failures folder under DB path (if available)
+                            if self.database and getattr(self.database, "config", None) and getattr(self.database.config, "db_path", None):
+                                import uuid, os, time
+
+                                failures_dir = os.path.join(self.database.config.db_path, "llm_failures")
+                                os.makedirs(failures_dir, exist_ok=True)
+                                file_name = f"iter{completed_iteration}_{uuid.uuid4().hex}.txt"
+                                file_path = os.path.join(failures_dir, file_name)
+                                with open(file_path, "w", encoding="utf-8") as fh:
+                                    fh.write(f"iteration: {completed_iteration}\n")
+                                    fh.write(f"parent_id: {getattr(result, 'parent_id', None)}\n")
+                                    fh.write(f"error: {result.error}\n")
+                                    fh.write(f"timestamp: {time.time()}\n\n")
+                                    fh.write("LLM response:\n")
+                                    fh.write(result.llm_response)
+
+                                logger.info(f"Saved LLM failure response to {file_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to write llm failure file: {e}")
+
                         logger.warning(
                             f"Iteration {completed_iteration} error: {result.error} | LLM response (truncated): {repr(result.llm_response)[:1000]}"
                         )
@@ -601,6 +623,22 @@ class ProcessParallelController:
                                 f"metric that properly weights different aspects of program performance."
                             )
                             self._warned_about_combined_score = True
+
+                    # If evaluator returned an error string inside metrics (e.g., syntax error),
+                    # log the LLM response for debugging if available.
+                    try:
+                        has_string_metric = any(
+                            isinstance(v, str) and v for v in child_program.metrics.values()
+                        )
+                    except Exception:
+                        has_string_metric = False
+
+                    if has_string_metric and getattr(result, "llm_response", None):
+                        logger.warning(
+                            "Iteration %s child program evaluation included string metrics (likely error); LLM response (truncated): %s",
+                            completed_iteration,
+                            repr(result.llm_response)[:2000],
+                        )
 
                     # Check for new best
                     if self.database.best_program_id == child_program.id:

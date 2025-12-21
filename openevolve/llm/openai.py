@@ -120,6 +120,27 @@ class OpenAILLM(LLMInterface):
             if reasoning_effort is not None:
                 params["reasoning_effort"] = reasoning_effort
 
+        # Support provider-specific extra body parameters (e.g., OpenRouter's extra_body)
+        # Merge user-supplied extra_body into params so it is forwarded to the provider.
+        user_extra = kwargs.get("extra_body")
+        if user_extra is not None:
+            # Ensure we don't overwrite an existing extra_body
+            params["extra_body"] = params.get("extra_body", {})
+            if isinstance(user_extra, dict):
+                params["extra_body"].update(user_extra)
+            else:
+                # If extra_body provided as non-dict, just set it directly
+                params["extra_body"] = user_extra
+
+        # For reasoning models, ensure reasoning is enabled by default unless user overrides
+        if is_openai_reasoning_model:
+            eb = params.get("extra_body")
+            if eb is None:
+                params["extra_body"] = {"reasoning": {"enabled": True}}
+            else:
+                if isinstance(eb, dict):
+                    eb.setdefault("reasoning", {"enabled": True})
+
         # Add seed parameter for reproducibility if configured
         # Skip seed parameter for Google AI Studio endpoint as it doesn't support it
         seed = kwargs.get("seed", self.random_seed)
@@ -165,8 +186,21 @@ class OpenAILLM(LLMInterface):
         response = await loop.run_in_executor(
             None, lambda: self.client.chat.completions.create(**params)
         )
-        # Logging of system prompt, user message and response content
+        # Logging of system prompt, user message and full response message (may include reasoning details)
         logger = logging.getLogger(__name__)
-        logger.debug(f"API parameters: {params}")
-        logger.debug(f"API response: {response.choices[0].message.content}")
-        return response.choices[0].message.content
+        logger.debug("API parameters: %s", params)
+        try:
+            message = response.choices[0].message
+            # Log content and any reasoning details if present
+            logger.debug("API response content: %s", getattr(message, "content", None))
+            rd = getattr(message, "reasoning_details", None)
+            if rd is not None:
+                logger.debug("API response reasoning_details: %s", rd)
+            return getattr(message, "content", "")
+        except Exception:
+            # Fallback: try to return raw text if structure differs
+            logger.debug("API response (raw): %s", response)
+            try:
+                return str(response)
+            except Exception:
+                return ""

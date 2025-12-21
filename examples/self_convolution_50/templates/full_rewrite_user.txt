@@ -1,0 +1,71 @@
+You must reply with valid Python source code only.
+
+Produce a minimal, import-free Python module that defines a nonnegative step function
+on the interval [-1/4, 1/4] using exactly 50 equal-width bins.
+
+HARD RULES (read carefully):
+
+* Reply with Python code only. No prose, no comments, no explanation, no Markdown.
+* The module must define exactly one of the following (do NOT provide both):
+  * a top-level variable `steps` which is a Python list that evaluates to
+    exactly 50 finite, real, nonnegative numbers, or
+  * a function `def get_steps():` that returns such a list.
+* The evaluated list length must be exactly 50 (the evaluator imports the
+  module and checks the final list length). Expressions that evaluate to a
+  50-element list (for example, `[0.0]*50`) are acceptable so long as the
+  evaluated result is exactly 50 numeric entries.
+* The list must be syntactically valid Python and must open with `[` and close
+  with `]`. Ensure brackets are balanced; do not output truncated lists.
+* All numbers must be finite, real, and nonnegative. Suggested numeric scale: 0–1000.
+* Do not add new imports, network calls, file I/O, or external integrations.
+
+INTERPRETATION:
+
+* The 50 values represent the heights of a piecewise-constant function on 50 equal
+  subintervals of [-1/4, 1/4], ordered left to right.
+* To avoid trivial solutions, **do not use all values identical**. Values should vary across the bins.
+
+GOAL:
+
+* The evaluator will compute the self-convolution f*f and derive:
+  * L1: integral of f*f (i.e. `self_convolution_L1`),
+  * L2sq: integral of (f*f)^2 (i.e. `self_convolution_L2sq`),
+  * Linf: maximum of f*f (i.e. `self_convolution_Linf`),
+  then R(f) = L2sq / (L1 * Linf) (i.e. `combined_score = L2sq / (L1 * Linf)`).
+* Your objective is to adjust the 50 step heights to **maximize R(f)**.
+  Focus on increasing L2sq and/or reducing L1 * Linf.
+
+CURRENT PROGRAM (included verbatim):
+
+```{language}
+{current_program}
+```
+
+TASK:
+
+* Use the provided `CURRENT PROGRAM` above as the starting point.
+* Do not add network calls, file I/O, or new external imports.
+* Output the complete Python module source exactly (so it can be imported).
+
+MINIMAL ACCEPTABLE OUTPUT EXAMPLES:
+
+Example 1 — top-level literal list (exactly 50 numbers):
+steps = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+         11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+         21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0,
+         31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0,
+         41.0, 42.0, 43.0, 44.0, 45.0, 46.0, 47.0, 48.0, 49.0, 50.0]
+
+Example 2 — function returning the list (exactly 50 numbers):
+def get_steps():
+    return [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+            11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+            21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0,
+            31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0,
+            41.0, 42.0, 43.0, 44.0, 45.0, 46.0, 47.0, 48.0, 49.0, 50.0]
+
+INSTRUCTIONS:
+
+* Produce `steps` (or `get_steps()`) consistent with the exact rules above.
+* Length must be exactly 50, values nonnegative, finite, and reasonably scaled.
+* Do not include any text outside the Python code.
