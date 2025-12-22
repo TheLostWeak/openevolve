@@ -1,0 +1,32 @@
+# Full Rewrite Task — Hex Packing
+
+You are given a program that outputs a candidate placement for placing 12 disjoint
+regular hexagons of unit side length inside a larger regular hexagon.
+
+Current performance metrics:
+{metrics}
+
+Program code:
+```{language}
+{current_program}
+```
+
+Task:
+- Provide a complete replacement `solution = [...]` Python snippet or a JSON array
+  containing 3*12 floats representing the improved (x,y,angle) triples.
+- The new solution must ensure no two hexagons overlap and should minimize the
+  side length of the containing regular hexagon.
+
+Note about outer hexagon parameters:
+- Your program MUST include the following top-level variables:
+  - `outer_hex_center = (x, y)`
+  - `outer_hex_side_length = <float>`
+  - `outer_hex_angle_degrees = <float>`
+  The evaluator will only validate these provided parameters and will NOT try
+  to compute the containing hexagon automatically. If your program does not
+  define these variables, the submission will be considered invalid.
+
+Requirements:
+- Output must be valid Python or JSON parseable by the evaluator.
+
+Be precise and return only the solution.
