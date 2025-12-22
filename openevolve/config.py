@@ -10,6 +10,38 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 import yaml
 
+# Attempt to load a .env file if present so users can store secrets there.
+# Prefer python-dotenv when available, otherwise fall back to a small manual loader.
+try:
+    from dotenv import load_dotenv
+
+    # Load .env from repository root (cwd when running CLI) if present
+    load_dotenv()
+except Exception:
+    # Fallback manual loader: read .env in current working directory
+    try:
+        env_path = Path.cwd() / ".env"
+        if env_path.exists():
+            for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip()
+                # Remove surrounding quotes if present
+                if (val.startswith('"') and val.endswith('"')) or (
+                    val.startswith("'") and val.endswith("'")
+                ):
+                    val = val[1:-1]
+                # Only set if not already present in environment
+                os.environ.setdefault(key, val)
+    except Exception:
+        # Best-effort only; do not fail import if .env cannot be read
+        pass
+
 if TYPE_CHECKING:
     from openevolve.llm.base import LLMInterface
 

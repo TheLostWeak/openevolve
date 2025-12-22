@@ -9,11 +9,10 @@ llm:
       weight: 1.0
 
 database:
-  db_path: "examples/hex_packing/openevolve_output/db"
+  db_path: "examples/cap_set_example/openevolve_output/db"
   log_prompts: true
   feature_dimensions:
     - "combined_score"
-    - "side_length"
   population_size: 200
   num_islands: 3
 
@@ -22,8 +21,17 @@ evaluator:
   cascade_evaluation: false
 
 prompt:
-  template_dir: "examples/hex_packing/templates"
+  template_dir: "examples/cap_set_example/templates"
 
 diff_based_evolution: false
 
-max_iterations: 100
+max_iterations: 200
+checkpoint_interval: 50
+
+evolution_trace:
+  enabled: true
+  include_prompts: true
+  include_code: false
+  format: jsonl
+  output_path: "examples/cap_set_example/openevolve_trace.jsonl"
+  buffer_size: 10

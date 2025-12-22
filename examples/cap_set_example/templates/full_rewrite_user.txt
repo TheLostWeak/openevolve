@@ -1,0 +1,62 @@
+You are allowed and encouraged to produce a complete, runnable Python module implementing a cap-set generator for F_3^n.
+
+Requirements
+- Provide at least one complete Python file that defines `def generate_set(n): -> List[Tuple[int,...]]` returning a cap set with coordinates in 0/1/2.
+- You may produce multiple full variants. If you also include a SEARCH/REPLACE patch, include the full rewritten file below the patch.
+- You are NOT limited to greedy algorithms. Creative approaches (randomized search, simulated annealing, genetic procedures, combinatorial constructions, multi-start heuristics) are allowed and welcomed.
+- Ensure the output is valid Python and uses only standard library imports.
+- Keep the module self-contained so it can be run as `python <file>`.
+
+Output format and instructions
+- If returning a full file, wrap it between the markers below so automated tooling can easily detect full-module responses:
+
+--- FULL MODULE START ---
+```python
+<full module text>
+```
+--- FULL MODULE END ---
+
+- If also providing a patch, use:
+
+--- PATCH START ---
+<SEARCH/REPLACE style patch>
+--- PATCH END ---
+
+Guidelines
+- The evaluator will call `generate_set(n)`; invalid sets receive score 0. Ensure the function returns a list/tuple of length-n tuples with values 0/1/2.
+- If your method uses randomness, expose a module-level `_RANDOM_SEED` variable and seed the RNG so results can be reproduced.
+- Prefer complete, runnable module output. If you also give a patch, include both the patch and the full module.
+
+Creativity prompt
+- You are free to use non-greedy, "mystery" or randomized strategies. Try multi-start randomized construction, simulated annealing, genetic combination of candidate sets, or any hybrid approach. Explain briefly (as comments) the intuition behind why your approach might produce larger cap sets.
+
+Safety notes
+- Backup the original file before applying any automated patch. The evaluator enforces correctness at runtime.
+
+Example of an allowed reply structure (preferred):
+
+--- FULL MODULE START ---
+```python
+# Optional imports
+import random
+from itertools import product
+
+_RANDOM_SEED = 42
+
+def generate_set(n):
+	# ... full implementation ...
+	return []
+
+if __name__ == '__main__':
+	s = generate_set(4)
+	print('cap set size=', len(s))
+```
+--- FULL MODULE END ---
+
+--- PATCH START ---
+<if also providing patch blocks>
+--- PATCH END ---
+
+Notes for the LLM:
+- Full-module output is preferred. If you provide only a patch, also include the full module below the patch.
+- Explain your approach briefly in comments at the top of the file.

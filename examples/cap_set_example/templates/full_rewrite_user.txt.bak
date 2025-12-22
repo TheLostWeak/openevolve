@@ -1,0 +1,38 @@
+Context & Evolutionary Process
+- You are participating in an automated evolutionary search. Your code will be evaluated by an external `evaluator` that calls `generate_set(n)`, checks the **cap set property** (no three distinct vectors sum to 0 in F_3^n), and returns the set size as the score. **An invalid set receives a score of zero.**
+- The current module follows a **greedy algorithm skeleton**: it ranks all vectors by a `priority` function and adds them if they maintain the cap set property via a `can_add` check.
+- **Your primary evolutionary lever is to improve the `priority` function.** A better function guides the greedy algorithm to choose vectors that ultimately allow for a larger final set.
+
+Goal
+- Improve the `priority`function (or related heuristics) so that `generate_set(n)` constructs a **larger valid cap set**.
+- Preserve the **greedy algorithm structure** and the correctness-critical `can_add` verification logic unless you have a compelling, well-tested improvement.
+- Keep results correct: returned set must be a list/tuple of tuples, each tuple of length n with coordinates in 0/1/2.
+
+Critical Constraints
+1.  **API Immutability:** Do NOT change the exposed function signature `generate_set(n)` (the evaluator calls this exact symbol).
+2.  **Correctness Core:** Do NOT modify the `can_add(new_vec, existing_set)` function unless you are fixing a bug or making a strictly more efficient variant that **preserves its exact logical contract**. Its correctness is paramount.
+3.  **Evolution Focus:** You **should** edit the `priority(vec, n)` function (or `_initial_priority`), module-level constants, and add helper functions. This is the main path to improvement.
+4.  **Determinism (for fair evaluation):** If using randomness, make it controllable via the existing `_RANDOM_SEED` module-level variable. The evaluator compares different code versions, so non-deterministic outputs are not acceptable.
+
+Technical Requirements
+- The module must run on Python 3.10+ with only the standard library.
+- Output of `generate_set(n)` must be a list/tuple of tuples of ints (0/1/2), each of length n.
+- Add clear inline comments explaining the intuition behind your priority heuristic and its time/space complexity.
+
+Output Instructions & Focus Areas
+- Provide the **full module text** as a single contiguous Python file.
+- **CRITICAL:** Place the main logic you want to be eligible for future evolution — specifically the `priority` function and any closely related new helper functions — between the following markers:
+
+```python
+# ========== EVOLVABLE REGION START ==========
+# LLM: Focus your changes and innovations here.
+# This typically includes the `priority` function and any direct helpers.
+...
+# ========== EVOLVABLE REGION END ==========
+```
+- Outside this region, keep code changes minimal and well-justified (e.g., fixing bugs, adding imports for your new helpers).
+- **Reasoning before coding:** Briefly explain (as a comment at the top of the evolvable region) the mathematical intuition or strategy behind your new priority heuristic. For example: "Priority favors vectors with fewer zeros because...", or "Assign higher scores to vectors whose coordinate sum mod 3 equals 1 based on observed structure...".
+
+Style
+- Be concise and explicit. Favor readability and correctness over clever but obscure optimizations.
+- Ensure all new functions have short docstrings.
