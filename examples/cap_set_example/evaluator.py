@@ -84,6 +84,7 @@ def _call_generate_in_subprocess(program_path: str, n: int, timeout_seconds: flo
 import importlib.util, importlib.machinery, json, sys, traceback
 spec = importlib.util.spec_from_file_location('genmod', r'{program_path}')
 mod = importlib.util.module_from_spec(spec)
+sys.modules['genmod'] = mod
 try:
     spec.loader.exec_module(mod)
 except Exception as e:
