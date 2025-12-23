@@ -23,21 +23,37 @@ Your goal is to maximize |A|. Correctness is mandatory; larger sets score higher
   - Define a module-level constant `_RANDOM_SEED`
   - Seed all RNGs deterministically
 
-## ALLOWED STRATEGIES (NOT EXHAUSTIVE)
+## STRUCTURE-ORIENTED GUIDANCE
 
-You are NOT restricted to greedy algorithms.
+The evaluator prefers cap sets that display clear mathematical structure
+(for example: symmetry, regular block/tiling patterns, orbit decompositions,
+affine/subspace constructions, or other compact parametric families). When
+producing a solution, favor constructions that expose and exploit such
+structure rather than merely listing many individual vectors.
 
-You are encouraged to explore:
-- Local search / hill climbing
-- Randomized multi-start construction
-- Simulated annealing
-- Genetic or evolutionary recombination
-- Constraint-based incremental construction
-- Compact rule-based or priority-based generators
-- Hybrid methods combining greedy + random perturbation
+Guidelines:
 
-Programs that *encode structure concisely* (rather than explicitly listing
-all vectors) are especially encouraged.
+- **Prefer structural descriptions:** produce generators or parametric
+  constructions (rules, formulas, or small building blocks) that generate
+  the set, instead of embedding long explicit lists of vectors.
+- **Encourage symmetry and invariance:** constructions that are invariant
+  under coordinate permutations, cyclic shifts, or group actions are valuable.
+- **Use compact encodings:** describe the set as orbits, repeated tiles,
+  cartesian products, affine translates, or other compact encodings when
+  possible.
+- **Structure summary:** include a short bullet summary naming the key
+  structural features (e.g., "cyclic shifts of base block B", "decomposes
+  into 3 orbits under rotation", "product of smaller cap sets").
+- **Reproducibility:** if randomness is used, expose `_RANDOM_SEED` and make
+  default runs deterministic so the construction can be replayed.
+
+Examples of structural ideas (non-exhaustive and optional): coordinate-wise
+patterns, cyclic/group orbits, product constructions, affine-subspace
+restrictions, block-tilings, and parameterized templates.
+
+Programs that provide a compact, structural description of the cap set and
+an accompanying short explanation of the invariants will be scored more
+favorably than programs that only output large enumerations.
 
 ## IMPLEMENTATION CONSTRAINTS (IMPORTANT)
 

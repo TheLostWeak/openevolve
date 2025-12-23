@@ -288,18 +288,13 @@ class PromptConfig:
     artifact_security_filter: bool = True
 
     # Feature extraction and program labeling
-    suggest_simplification_after_chars: Optional[int] = (
-        500  # Suggest simplifying if program exceeds this many characters
-    )
-    include_changes_under_chars: Optional[int] = (
-        100  # Include change descriptions in features if under this length
-    )
-    concise_implementation_max_lines: Optional[int] = (
-        10  # Label as "concise" if program has this many lines or fewer
-    )
-    comprehensive_implementation_min_lines: Optional[int] = (
-        50  # Label as "comprehensive" if program has this many lines or more
-    )
+    # Feature extraction and program labeling
+    # Disable automatic suggestions/labels based on program character/line
+    # counts by default for tasks that require flexible program sizes
+    suggest_simplification_after_chars: Optional[int] = None
+    include_changes_under_chars: Optional[int] = None
+    concise_implementation_max_lines: Optional[int] = None
+    comprehensive_implementation_min_lines: Optional[int] = None
 
     # Backward compatibility - deprecated
     code_length_threshold: Optional[int] = (
@@ -433,7 +428,8 @@ class Config:
 
     # Evolution settings
     diff_based_evolution: bool = True
-    max_code_length: int = 10000
+    # If None, do not enforce a hard maximum code length for generated programs.
+    max_code_length: Optional[int] = None
     diff_pattern: str = r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
 
     # Early stopping settings
