@@ -9,6 +9,14 @@ import os
 import sys
 from typing import Dict, List, Optional
 
+# Allow loading API keys from a local .env file if python-dotenv is available.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 from openevolve import OpenEvolve
 from openevolve.config import Config, load_config
 

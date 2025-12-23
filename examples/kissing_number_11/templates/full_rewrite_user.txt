@@ -10,11 +10,11 @@ Do NOT explain them. Do NOT restate them.
 
 ---
 
-## Current Program
+## Current Program (reference only)
 
-```{language}
+BEGIN_CURRENT_PROGRAM
 {current_program}
-```
+END_CURRENT_PROGRAM
 
 ---
 
@@ -24,17 +24,14 @@ Return a COMPLETE replacement of the program source file.
 
 The program MUST define:
 
-```
 def get_C():
-```
 
 and MUST return a NON-EMPTY Python list of points.
 
 Each point:
-
-* is a list or tuple
-* has EXACTLY 11 coordinates
-* ALL coordinates are EXACT INTEGERS
+- is a list or tuple
+- has EXACTLY 11 coordinates
+- ALL coordinates are EXACT INTEGERS
 
 ---
 
@@ -49,65 +46,59 @@ A smaller VALID set is ALWAYS better than a larger INVALID one.
 
 ## HARD CONSTRAINTS (NO EXCEPTIONS)
 
-### C0: Integer-only geometry
+C0: Integer-only geometry  
+C1: Origin exclusion  
+C2: Global distance domination  
 
-* Every coordinate MUST be an integer literal.
-* Floating-point values, fractions, or computed values are FORBIDDEN.
-
-### C1: Origin exclusion
-
-* The zero vector (0,0,0,0,0,0,0,0,0,0,0) MUST NOT appear in C.
-
-### C2: Global distance domination
-
-Let ||x|| denote the Euclidean norm.
-Define max_norm as:
-
-```
-max_norm = max(||x|| for x in C)
-```
-
-For EVERY pair of DISTINCT points x != y in C, it MUST hold that:
-
-```
-||x - y|| >= max_norm
-```
-
-This condition is GLOBAL and applies to ALL pairs.
+(Definitions unchanged; see previous specification.)
 
 ---
 
-## STRATEGY GUIDANCE (CRITICAL - READ CAREFULLY)
+## CRITICAL ALGORITHMIC REQUIREMENT (MANDATORY)
 
-This is a high-dimensional INTEGER feasibility problem.
-Do NOT assume spherical shells, angular separation, or uniform norms.
+The set C MUST be produced by an EXPLICIT ALGORITHMIC SEARCH
+or OPTIMIZATION PROCESS.
 
-Key facts implied by the constraints:
+Specifically:
 
-* The distance constraint is equivalent to a squared-sum condition:
+- C must be the RESULT of an algorithm that incrementally
+  constructs, tests, and accepts/rejects candidate points.
+- The algorithm MUST include:
+  - candidate generation
+  - explicit distance checking against existing points
+  - conditional acceptance or rejection
 
-  ```
-  for all x != y:
-      sum_i (x_i - y_i)^2 >= max_norm^2
-  ```
+The following are STRONGLY DISCOURAGED and should be AVOIDED:
 
-  Large distances can be achieved by distributing squared differences
-  across MANY coordinates at once, not only by directional separation.
+- Direct closed-form constructions
+- Purely combinatorial enumeration of coordinate patterns
+- Hard-coded lists of points
+- Simple symbolic rules of the form
+  “for all i,j assign ±M to coordinates”
 
-* The value of max_norm may be determined by ONE or a very small number
-  of points. Most points in C do NOT need to have norm close to max_norm.
+If the entire set C can be described succinctly
+without running a search or validation loop,
+the solution is considered LOW QUALITY.
 
-* Valid solutions may be highly non-uniform, non-symmetric, and irregular.
-  Points do NOT need to form a clean geometric structure.
-  "Ugly but valid" integer constructions are acceptable and often superior.
+Prefer smaller VALID sets produced by a genuine algorithm
+over larger sets produced by direct construction.
 
-* Think in terms of combinatorial energy allocation in Z^11:
-  mixed signs, varied magnitudes, and multiple coordinates contributing
-  moderate differences whose squares sum to the required threshold.
+---
 
-* Large integer magnitudes are useful because they allow finer-grained
-  allocation of squared differences under integer-only constraints,
-  not because of scaling or normalization.
+## STRATEGY GUIDANCE
+
+Think in terms of:
+- greedy packing
+- randomized search with rejection
+- iterative augmentation
+- local improvement under constraints
+
+The algorithm does NOT need to be optimal,
+but it MUST genuinely SEARCH.
+
+Large integer magnitudes are useful because they allow finer-grained
+allocation of squared differences under integer-only constraints,
+not because of scaling or normalization.
 
 ### SOTA HINTS (LEVERAGE KNOWN STRUCTURE)
 
@@ -124,54 +115,15 @@ Key facts implied by the constraints:
   - Prefer larger coordinates (e.g., around 1e12-1e13) to keep distances well above the threshold.
   - Aim for a **large |C|** (e.g., larger than 100 if possible); avoid returning tiny sets unless necessary for validity.
 
-Avoid assuming:
-
-* a single spherical shell
-* angular or kissing-number intuition
-* sparsity or axis-aligned structure
-* symmetry or equal-radius designs
-
-Validity is binary. If unsure, return fewer points.
-
 ---
 
 ## OUTPUT FORMAT (STRICT)
 
-Return ONLY a single fenced Python code block containing a valid module.
+Your entire response MUST be EXACTLY ONE Python fenced code block.
 
-The module MUST:
+- The response MUST start with ```python
+- The response MUST end with ```
+- NO text outside the code block.
+- The code block MUST define get_C() at top level.
 
-* define def get_C() at top level
-* return a non-empty Python list
-* use ONLY integer coordinates
-* NOT include the origin
-* include NO text outside the code block
-
-Any deviation results in INVALID output.
-
----
-
-## FAILURE MODES (AUTOMATIC REJECTION)
-
-The output is INVALID if ANY of the following occur:
-
-* any coordinate is non-integer
-* any point has length != 11
-* the origin is included
-* any pair violates the distance constraint
-* more than one code block is present
-* any text appears outside the code block
-
----
-
-## MINIMAL VALID EXAMPLE (NOT OPTIMAL)
-
-```python
-def get_C():
-    return [
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    ]
-```
-
-Return ONLY the program source code.
+Now output the replacement program.
