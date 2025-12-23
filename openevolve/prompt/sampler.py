@@ -134,8 +134,9 @@ class PromptSampler:
         fitness_score = get_fitness_score(program_metrics, feature_dimensions)
         feature_coords = format_feature_coordinates(program_metrics, feature_dimensions)
 
-        # Format the final user message
-        user_message = user_template.format(
+        # Format the final user message using safe formatting to avoid KeyError
+        user_message = self._safe_format(
+            user_template,
             metrics=metrics_str,
             fitness_score=f"{fitness_score:.4f}",
             feature_coords=feature_coords,
@@ -293,7 +294,8 @@ class PromptSampler:
                 outcome = "Regression in all metrics"
 
             previous_attempts_str += (
-                previous_attempt_template.format(
+                self._safe_format(
+                    previous_attempt_template,
                     attempt_number=attempt_number,
                     changes=changes,
                     performance=performance_str,
@@ -329,7 +331,8 @@ class PromptSampler:
             key_features_str = ", ".join(key_features)
 
             top_programs_str += (
-                top_program_template.format(
+                self._safe_format(
+                    top_program_template,
                     program_number=i + 1,
                     score=f"{score:.4f}",
                     language=language,
@@ -376,7 +379,8 @@ class PromptSampler:
                     key_features_str = ", ".join(key_features)
 
                     diverse_programs_str += (
-                        top_program_template.format(
+                        self._safe_format(
+                            top_program_template,
                             program_number=f"D{i + 1}",
                             score=f"{score:.4f}",
                             language=language,
@@ -395,7 +399,8 @@ class PromptSampler:
         )
 
         # Combine into full history
-        return history_template.format(
+        return self._safe_format(
+            history_template,
             previous_attempts=previous_attempts_str.strip(),
             top_programs=combined_programs_str.strip(),
             inspirations_section=inspirations_section_str,
@@ -440,7 +445,8 @@ class PromptSampler:
             unique_features = self._extract_unique_features(program)
 
             inspiration_programs_str += (
-                inspiration_program_template.format(
+                self._safe_format(
+                    inspiration_program_template,
                     program_number=i + 1,
                     score=f"{score:.4f}",
                     program_type=program_type,
@@ -451,9 +457,26 @@ class PromptSampler:
                 + "\n\n"
             )
 
-        return inspirations_section_template.format(
-            inspiration_programs=inspiration_programs_str.strip()
+        return self._safe_format(
+            inspirations_section_template, inspiration_programs=inspiration_programs_str.strip()
         )
+
+    class _SafeDict(dict):
+        def __missing__(self, key):
+            # Preserve unknown placeholders as literal `{key}` to avoid KeyError
+            return "{" + key + "}"
+
+    def _safe_format(self, template: str, **kwargs: Any) -> str:
+        """Safely format templates: unknown placeholders are left intact instead of raising KeyError."""
+        try:
+            return template.format_map(self._SafeDict(**kwargs))
+        except Exception:
+            # Fallback: attempt normal format to raise original error if needed
+            try:
+                return template.format(**kwargs)
+            except Exception:
+                logger.debug("Safe formatting failed; returning template raw")
+                return template
 
     def _determine_program_type(
         self, program: Dict[str, Any], feature_dimensions: Optional[List[str]] = None

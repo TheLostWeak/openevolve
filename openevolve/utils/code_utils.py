@@ -103,33 +103,44 @@ def parse_full_rewrite(llm_response: str, language: str = "python") -> Optional[
     Returns:
         Extracted code or None if not found
     """
-    # Accept either LF or CRLF after the code fence and capture contents lazily
-    code_block_pattern = r"```" + language + r"\r?\n(.*?)```"
-    matches = re.findall(code_block_pattern, llm_response, re.DOTALL)
+    # 1) Prefer explicit fenced code blocks with language tag, e.g. ```python
+    code_block_pattern = r"```" + re.escape(language) + r"\r?\n(.*?)```"
+    matches = re.findall(code_block_pattern, llm_response, re.DOTALL | re.IGNORECASE)
 
     if matches:
         return matches[0].strip()
 
-    # Fallback to any code block
-    # Fallback: any fenced code block with optional language tag
+    # 2) Fallback to any fenced code block (no language tag)
     code_block_pattern = r"```(?:\w+)?\r?\n(.*?)```"
     matches = re.findall(code_block_pattern, llm_response, re.DOTALL)
-
     if matches:
         return matches[0].strip()
 
-    # If no fenced block matched, try to strip surrounding triple-backticks
-    stripped = llm_response.strip()
-
-    # If there is a leading fence, remove it (handles missing closing fence too)
-    if stripped.startswith("```"):
-        inner = re.sub(r"^```(?:\w+)?\r?\n", "", stripped)
-        # Remove trailing fence if present
+    # 3) Detect custom full-module markers used by some prompts: --- FULL MODULE START --- ... --- FULL MODULE END ---
+    full_module_pattern = r"---\s*FULL MODULE START\s*---(.*?)(?:---\s*FULL MODULE END\s*---|$)"
+    matches = re.findall(full_module_pattern, llm_response, re.DOTALL | re.IGNORECASE)
+    if matches:
+        # Inner content may itself contain fenced blocks; try to strip fences if present
+        inner = matches[0].strip()
+        # Remove leading/trailing triple-backticks if present
+        inner = re.sub(r"^```(?:\w+)?\r?\n", "", inner)
         inner = re.sub(r"\r?\n```$", "", inner)
         return inner.strip()
 
-    # Fallback to plain text (may still contain fences)
-    return llm_response
+    # 4) If the model returned a raw module without fences, try to heuristically extract
+    # code by locating a useful code start (imports, module-level constants, or def/class)
+    # and return from that point to the end (trimmed).
+    heuristic_start = re.search(r"(^|\n)(?:from\s+[\w\.]+|import\s+[\w_,\s]+|_RANDOM_SEED|def\s+generate_set|class\s+\w+)", llm_response)
+    if heuristic_start:
+        start_idx = heuristic_start.start()
+        candidate = llm_response[start_idx:].strip()
+        # If candidate contains closing markers (like '--- FULL MODULE END ---'), strip them
+        candidate = re.split(r"---\s*FULL MODULE END\s*---", candidate, flags=re.IGNORECASE)[0]
+        # Limit size to avoid returning enormous unrelated text
+        return candidate.strip()
+
+    # 5) As a last resort, return the entire response (caller will validate)
+    return llm_response.strip()
 
 
 def format_diff_summary(diff_blocks: List[Tuple[str, str]]) -> str:

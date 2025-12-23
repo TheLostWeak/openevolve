@@ -10,6 +10,7 @@ import random
 import shutil
 import time
 import uuid
+import tempfile
 from dataclasses import asdict, dataclass, field, fields
 
 # FileLock removed - no longer needed with threaded parallel processing
@@ -2544,3 +2545,26 @@ class ProgramDatabase:
         if program_id not in self.prompts_by_program:
             self.prompts_by_program[program_id] = {}
         self.prompts_by_program[program_id][template_key] = prompt
+
+        # Also persist prompt to disk immediately for auditability (atomic write)
+        try:
+            db_path = getattr(self.config, "db_path", None)
+            if db_path:
+                prompts_dir = os.path.join(db_path, "prompts")
+                os.makedirs(prompts_dir, exist_ok=True)
+                safe_filename = f"{program_id}_{template_key}.json"
+                final_path = os.path.join(prompts_dir, safe_filename)
+                fd, tmp_path = tempfile.mkstemp(prefix=".prompt_tmp_", dir=prompts_dir)
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                        payload = {"program_id": program_id, "template_key": template_key, "prompt": prompt, "responses": responses or [], "saved_at": time.time()}
+                        json.dump(payload, fh, ensure_ascii=False, indent=2)
+                    os.replace(tmp_path, final_path)
+                except Exception:
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                    raise
+        except Exception as e:
+            logger.warning(f"Failed to persist prompt for program {program_id}: {e}")

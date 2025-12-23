@@ -207,8 +207,7 @@ def _run_iteration_worker(
             diff_blocks = extract_diffs(llm_response, _worker_config.diff_pattern)
             if not diff_blocks:
                 logger.debug(
-                    "No diffs extracted from LLM response (truncated): %s",
-                    repr(llm_response)[:1000],
+                    "No diffs extracted from LLM response (response content suppressed for logs)."
                 )
                 return SerializableResult(
                     error=f"No valid diffs found in response",
@@ -224,8 +223,7 @@ def _run_iteration_worker(
             new_code = parse_full_rewrite(llm_response, _worker_config.language)
             if not new_code:
                 logger.debug(
-                    "No code extracted from LLM response (truncated): %s",
-                    repr(llm_response)[:1000],
+                    "No code extracted from LLM response (response content suppressed for logs)."
                 )
                 return SerializableResult(
                     error=f"No valid code found in response",
@@ -496,9 +494,22 @@ class ProcessParallelController:
                 result = future.result(timeout=timeout_seconds)
 
                 if result.error:
-                    # If worker included the raw LLM response, log a truncated version for debugging
-                    # If worker included the raw LLM response, persist it to disk for post-mortem
-                    if getattr(result, "llm_response", None):
+                    # Persist prompt+response (and error) atomically for audit regardless of llm_response truthiness.
+                    try:
+                        prompt_saved = self._persist_prompt_response(
+                            iteration=completed_iteration,
+                            parent_id=getattr(result, "parent_id", None),
+                            child_id=getattr(result, "child_id", None),
+                            prompt=getattr(result, "prompt", None),
+                            # Always include the raw llm_response value (may be None or empty string)
+                            responses=[getattr(result, "llm_response", None)],
+                            error=result.error,
+                        )
+                    except Exception:
+                        prompt_saved = None
+
+                    # If there is any raw llm_response (including empty string), write a failure file for post-mortem
+                    if getattr(result, "llm_response", None) is not None:
                         try:
                             # Attempt to write full LLM response to a failures folder under DB path (if available)
                             if self.database and getattr(self.database, "config", None) and getattr(self.database.config, "db_path", None):
@@ -514,14 +525,31 @@ class ProcessParallelController:
                                     fh.write(f"error: {result.error}\n")
                                     fh.write(f"timestamp: {time.time()}\n\n")
                                     fh.write("LLM response:\n")
-                                    fh.write(result.llm_response)
+                                    # Write even empty string if that's what we received
+                                    fh.write(getattr(result, "llm_response", ""))
 
                                 logger.info(f"Saved LLM failure response to {file_path}")
+                                # Also attempt to extract a python module from the raw response
+                                try:
+                                    from openevolve.utils.code_utils import parse_full_rewrite
+
+                                    extracted = parse_full_rewrite(getattr(result, "llm_response", ""), _worker_config.language)
+                                    if extracted:
+                                        ext_path = file_path + ".extracted.py"
+                                        with open(ext_path, "w", encoding="utf-8") as efh:
+                                            efh.write("# EXTRACTED_CODE\n")
+                                            efh.write(extracted)
+                                        logger.info(f"Saved extracted code to {ext_path}")
+                                except Exception:
+                                    # Non-fatal: log and continue
+                                    logger.debug("Failed to extract code from LLM response for failure file")
                         except Exception as e:
                             logger.warning(f"Failed to write llm failure file: {e}")
 
+                    # Log the outcome, including where prompt+response were saved (if any)
+                    if prompt_saved:
                         logger.warning(
-                            f"Iteration {completed_iteration} error: {result.error} | LLM response (truncated): {repr(result.llm_response)[:1000]}"
+                            f"Iteration {completed_iteration} error: {result.error} | LLM prompt+response saved to {prompt_saved}"
                         )
                     else:
                         logger.warning(f"Iteration {completed_iteration} error: {result.error}")
@@ -564,6 +592,21 @@ class ProcessParallelController:
                             )
 
                     # Log prompts
+                    # Persist prompt+response immediately (audit-safe)
+                    prompt_saved_path = None
+                    try:
+                        prompt_saved_path = self._persist_prompt_response(
+                            iteration=completed_iteration,
+                            parent_id=result.parent_id,
+                            child_id=child_program.id,
+                            prompt=result.prompt,
+                            responses=[result.llm_response] if result.llm_response else [],
+                            error=None,
+                        )
+                    except Exception:
+                        prompt_saved_path = None
+
+                    # Log prompts to DB (keeps in-memory mapping and will be saved at checkpoint)
                     if result.prompt:
                         self.database.log_prompt(
                             template_key=(
@@ -633,12 +676,18 @@ class ProcessParallelController:
                     except Exception:
                         has_string_metric = False
 
-                    if has_string_metric and getattr(result, "llm_response", None):
-                        logger.warning(
-                            "Iteration %s child program evaluation included string metrics (likely error); LLM response (truncated): %s",
-                            completed_iteration,
-                            repr(result.llm_response)[:2000],
-                        )
+                    if has_string_metric:
+                        if getattr(result, "llm_response", None) and prompt_saved_path:
+                            logger.warning(
+                                "Iteration %s child program evaluation included string metrics (likely error); prompt+response saved to: %s",
+                                completed_iteration,
+                                prompt_saved_path,
+                            )
+                        else:
+                            logger.warning(
+                                "Iteration %s child program evaluation included string metrics (likely error); see logs for details",
+                                completed_iteration,
+                            )
 
                     # Check for new best
                     if self.database.best_program_id == child_program.id:
@@ -795,4 +844,65 @@ class ProcessParallelController:
 
         except Exception as e:
             logger.error(f"Error submitting iteration {iteration}: {e}")
+            return None
+
+    def _persist_prompt_response(
+        self,
+        iteration: int,
+        parent_id: Optional[str],
+        child_id: Optional[str],
+        prompt: Optional[Dict[str, str]],
+        responses: Optional[List[str]] = None,
+        error: Optional[str] = None,
+    ) -> Optional[str]:
+        """Atomically persist prompt + responses + error to disk and return the saved path.
+
+        Writes to `{db_path}/prompts/` if available, otherwise to `log_dir/prompts/`.
+        Uses a temporary file + os.replace for atomicity.
+        """
+        try:
+            import json
+            import time
+            import tempfile
+            import os
+
+            base_dir = None
+            if self.database and getattr(self.database, "config", None):
+                base_dir = getattr(self.database.config, "db_path", None)
+
+            if not base_dir:
+                base_dir = getattr(self.config, "log_dir", None) or os.getcwd()
+
+            prompts_dir = os.path.join(base_dir, "prompts")
+            os.makedirs(prompts_dir, exist_ok=True)
+
+            safe_child = child_id or "nochild"
+            timestamp = int(time.time())
+            final_name = os.path.join(prompts_dir, f"iter{iteration}_{safe_child}_{timestamp}.json")
+            fd, tmp_path = tempfile.mkstemp(prefix=".prompt_tmp_", dir=prompts_dir)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    payload = {
+                        "iteration": iteration,
+                        "parent_id": parent_id,
+                        "child_id": child_id,
+                        "prompt": prompt,
+                        "responses": responses or [],
+                        "error": error,
+                        "saved_at": time.time(),
+                    }
+                    json.dump(payload, fh, ensure_ascii=False, indent=2)
+
+                # Atomic replace
+                os.replace(tmp_path, final_name)
+                return final_name
+            except Exception:
+                # Clean up tmp file if something went wrong
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                raise
+        except Exception as e:
+            logger.warning(f"Failed to persist prompt/response to disk: {e}")
             return None

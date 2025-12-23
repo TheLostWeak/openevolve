@@ -97,8 +97,11 @@ class OpenAILLM(LLMInterface):
             params = {
                 "model": self.model,
                 "messages": formatted_messages,
-                "max_completion_tokens": kwargs.get("max_tokens", self.max_tokens),
             }
+            # Only include max_completion_tokens if explicitly configured.
+            max_completion = kwargs.get("max_tokens", self.max_tokens)
+            if max_completion is not None:
+                params["max_completion_tokens"] = max_completion
             # Add optional reasoning parameters if provided
             reasoning_effort = kwargs.get("reasoning_effort", self.reasoning_effort)
             if reasoning_effort is not None:
@@ -112,8 +115,11 @@ class OpenAILLM(LLMInterface):
                 "messages": formatted_messages,
                 "temperature": kwargs.get("temperature", self.temperature),
                 "top_p": kwargs.get("top_p", self.top_p),
-                "max_tokens": kwargs.get("max_tokens", self.max_tokens),
             }
+            # Only include max_tokens if explicitly configured.
+            max_t = kwargs.get("max_tokens", self.max_tokens)
+            if max_t is not None:
+                params["max_tokens"] = max_t
 
             # Handle reasoning_effort for open source reasoning models.
             reasoning_effort = kwargs.get("reasoning_effort", self.reasoning_effort)
@@ -196,7 +202,37 @@ class OpenAILLM(LLMInterface):
             rd = getattr(message, "reasoning_details", None)
             if rd is not None:
                 logger.debug("API response reasoning_details: %s", rd)
-            return getattr(message, "content", "")
+
+            content = getattr(message, "content", None)
+            # If content is empty/None, dump full response repr for debugging to a debug folder
+            if not content:
+                try:
+                    import os, time, uuid
+
+                    debug_dir = os.path.join(os.getcwd(), "examples", "cap_set_example", "openevolve_output", "db", "llm_response_debug")
+                    os.makedirs(debug_dir, exist_ok=True)
+                    fname = f"response_debug_{int(time.time())}_{uuid.uuid4().hex}.repr.txt"
+                    fpath = os.path.join(debug_dir, fname)
+                    with open(fpath, "w", encoding="utf-8") as fh:
+                        fh.write("--- repr(response) ---\n")
+                        try:
+                            fh.write(repr(response))
+                        except Exception:
+                            try:
+                                fh.write(str(response))
+                            except Exception:
+                                fh.write("<unrepresentable response object>")
+                        fh.write("\n\n--- raw content attempt ---\n")
+                        try:
+                            # attempt to dump common fields
+                            fh.write(str(getattr(response, "__dict__", {})))
+                        except Exception:
+                            pass
+                    logger.info(f"Saved raw response repr to {fpath} for debugging")
+                except Exception:
+                    logger.debug("Failed to write response debug file")
+
+            return content or ""
         except Exception:
             # Fallback: try to return raw text if structure differs
             logger.debug("API response (raw): %s", response)

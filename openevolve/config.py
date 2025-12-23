@@ -126,12 +126,14 @@ class LLMConfig(LLMModelConfig):
     system_message: Optional[str] = "system_message"
     temperature: float = 0.7
     top_p: float = 0.95
-    max_tokens: int = 4096
+    # If None, do not explicitly set max_tokens and let the provider use the
+    # model's own maximum token budget.
+    max_tokens: Optional[int] = None
 
     # Request parameters
     timeout: int = 3600  # 1 hour
     retries: int = 3
-    retry_delay: int = 5
+    retry_delay: int = 20
 
     # n-model configuration for evolution LLM ensemble
     models: List[LLMModelConfig] = field(default_factory=list)

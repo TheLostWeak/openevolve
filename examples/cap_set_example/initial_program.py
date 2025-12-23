@@ -1,28 +1,45 @@
 import itertools
 import random
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Callable, Optional
+
+# Hard-coded dimension for this example. All generator code should use this value.
+CAP_N = 6
 
 # Fixed random seed for reproducibility. LLMs may modify this seed or introduce randomness.
 _RANDOM_SEED = 42
 random.seed(_RANDOM_SEED)
 
-def can_add(new_vec: Tuple[int, ...], existing_set: List[Tuple[int, ...]]) -> bool:
+def can_add(new_vec: Tuple[int, ...], existing_list: List[Tuple[int, ...]], existing_set: Optional[set] = None) -> bool:
     """
-    Check whether adding `new_vec` to `existing_set` preserves the Cap Set property.
-    This performs an incremental validity check for efficiency.
-    """
-    existing = set(existing_set)
-    
-    # Check 1: Check for duplicate element (new_vec already in the set).
-    if new_vec in existing:
-        return False
+    Efficient incremental check for whether `new_vec` can be added to the
+    current cap set without violating the cap set property.
 
-    # Check 2: Check if `new_vec` forms an illegal triple with two vectors
-    # from `existing_set`, i.e. whether there exist x, y in existing_set such
-    # that x + y + new_vec == 0 (mod 3).
-    for x in existing_set:
-        y = tuple((-(x[i] + new_vec[i])) % 3 for i in range(len(new_vec)))
-        if y in existing and y != x:
+    This function accepts both the list of existing vectors (in insertion
+    order) and an optional set for O(1) membership checks. If `existing_set`
+    is not provided it will be constructed from `existing_list`.
+
+    Args:
+        new_vec: Candidate vector to add.
+        existing_list: List of vectors already in the cap set (in order).
+        existing_set: Optional set of those vectors for O(1) lookups.
+
+    Returns:
+        True if `new_vec` can be added without creating a 3-term arithmetic
+        progression (mod 3), otherwise False.
+    """
+    n = len(new_vec)
+    if existing_set is None:
+        existing_set = set(existing_list)
+
+    # Duplicate check
+    if new_vec in existing_set:
+        return False
+    # For each existing vector x compute y = -(x + new_vec) and check if y
+    # is present in the set. This is O(m) checks with O(1) membership tests.
+    for x in existing_list:
+        # Build the tuple directly; zip is slightly faster and clearer.
+        y = tuple((-(a + b)) % 3 for a, b in zip(x, new_vec))
+        if y in existing_set and y != x:
             return False
 
     return True
@@ -64,31 +81,34 @@ def gen_set(n: int, priority_func: Callable[[Tuple[int, ...], int], float] = Non
     """
     if priority_func is None:
         priority_func = _initial_priority
-    
+
     # 1. Generate all vectors in F_3^n
     all_vectors = list(itertools.product([0, 1, 2], repeat=n))
-    
+
     # 2. Sort candidates by priority (higher priority first)
-    sorted_vectors = sorted(all_vectors,
-                            key=lambda v: priority_func(v, n),
-                            reverse=True)
-    
-    # 3. Greedy construction
-    capset = []
+    sorted_vectors = sorted(all_vectors, key=lambda v: priority_func(v, n), reverse=True)
+
+    # 3. Greedy construction with a persistent set for O(1) membership checks
+    capset: List[Tuple[int, ...]] = []
+    capset_set = set()
+
     for vec in sorted_vectors:
-        if can_add(vec, capset):
+        # fast skip duplicates
+        if vec in capset_set:
+            continue
+
+        if can_add(vec, capset, capset_set):
             capset.append(vec)
-    
+            capset_set.add(vec)
+
     return capset
 
 def generate_set_for_eval(n: int) -> List[Tuple[int, ...]]:
     """
-    Wrapper used by the evaluator. Uses the default initial priority function.
-
-    Note: during evolution OpenEvolve/LLMs will rewrite parts of this module,
-    so the wrapped priority function may be replaced by an evolved version.
+    Wrapper used by the evaluator. For this example `n` is fixed to `CAP_N`.
     """
-    return gen_set(n, priority_func=_initial_priority)
+    return gen_set(CAP_N, priority_func=_initial_priority)
+
 
 priority = _initial_priority
 generate_set = generate_set_for_eval

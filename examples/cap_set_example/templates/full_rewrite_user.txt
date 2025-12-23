@@ -1,62 +1,86 @@
-You are allowed and encouraged to produce a complete, runnable Python module implementing a cap-set generator for F_3^n.
+You are allowed and encouraged to produce a complete, runnable Python module
+that constructs a large cap set in F_3^n.
 
-Requirements
-- Provide at least one complete Python file that defines `def generate_set(n): -> List[Tuple[int,...]]` returning a cap set with coordinates in 0/1/2.
-- You may produce multiple full variants. If you also include a SEARCH/REPLACE patch, include the full rewritten file below the patch.
-- You are NOT limited to greedy algorithms. Creative approaches (randomized search, simulated annealing, genetic procedures, combinatorial constructions, multi-start heuristics) are allowed and welcomed.
-- Ensure the output is valid Python and uses only standard library imports.
-- Keep the module self-contained so it can be run as `python <file>`.
+IMPORTANT: For this task, fix the dimension to n = 6.
 
-Output format and instructions
-- If returning a full file, wrap it between the markers below so automated tooling can easily detect full-module responses:
+A cap set is a subset A of F_3^n such that there are no three *distinct*
+elements x, y, z in A with x + y + z ≡ 0 (mod 3) coordinate-wise.
 
---- FULL MODULE START ---
+Your goal is to maximize |A|. Correctness is mandatory; larger sets score higher.
+
+## REQUIREMENTS
+
+- Output at least one COMPLETE, runnable Python file.
+- The file must define:
+
+    def generate_set(n) -> List[Tuple[int, ...]]
+
+  which returns a cap set with entries in 0/1/2.
+
+- Only Python standard library imports are allowed.
+
+- If randomness is used:
+  - Define a module-level constant `_RANDOM_SEED`
+  - Seed all RNGs deterministically
+
+## ALLOWED STRATEGIES (NOT EXHAUSTIVE)
+
+You are NOT restricted to greedy algorithms.
+
+You are encouraged to explore:
+- Local search / hill climbing
+- Randomized multi-start construction
+- Simulated annealing
+- Genetic or evolutionary recombination
+- Constraint-based incremental construction
+- Compact rule-based or priority-based generators
+- Hybrid methods combining greedy + random perturbation
+
+Programs that *encode structure concisely* (rather than explicitly listing
+all vectors) are especially encouraged.
+
+## IMPLEMENTATION CONSTRAINTS (IMPORTANT)
+
+- Keep runtime bounded and predictable.
+- Avoid super-exponential or unbounded loops.
+- If your approach is potentially expensive, introduce explicit limits such as:
+
+    MAX_ITERATIONS
+    MAX_RESTARTS
+    TIME_LIMIT_SECONDS
+    MAX_CANDIDATES
+
+- Prefer incremental or local checks over full O(|A|^3) verification.
+  Useful ideas include:
+  - Precomputing forbidden third points
+  - Encoding vectors as base-3 integers
+  - Maintaining conflict counters
+  - Sampling candidate moves
+
+- When unsure, prefer a SMALL, SAFE modification over a full rewrite.
+
+## OUTPUT FORMAT
+
+Return ONLY a full Python module, enclosed in:
+
 ```python
 <full module text>
-```
---- FULL MODULE END ---
+````
 
-- If also providing a patch, use:
+## DOCUMENTATION (LIGHTWEIGHT)
 
---- PATCH START ---
-<SEARCH/REPLACE style patch>
---- PATCH END ---
+At the top of the file, include brief comments explaining:
 
-Guidelines
-- The evaluator will call `generate_set(n)`; invalid sets receive score 0. Ensure the function returns a list/tuple of length-n tuples with values 0/1/2.
-- If your method uses randomness, expose a module-level `_RANDOM_SEED` variable and seed the RNG so results can be reproduced.
-- Prefer complete, runnable module output. If you also give a patch, include both the patch and the full module.
+* The high-level idea of your construction/search
+* Why this strategy might find larger cap sets
 
-Creativity prompt
-- You are free to use non-greedy, "mystery" or randomized strategies. Try multi-start randomized construction, simulated annealing, genetic combination of candidate sets, or any hybrid approach. Explain briefly (as comments) the intuition behind why your approach might produce larger cap sets.
+Do NOT include external references or excessive explanation.
 
-Safety notes
-- Backup the original file before applying any automated patch. The evaluator enforces correctness at runtime.
+---
 
-Example of an allowed reply structure (preferred):
+## NOTES FOR THE MODEL
 
---- FULL MODULE START ---
-```python
-# Optional imports
-import random
-from itertools import product
-
-_RANDOM_SEED = 42
-
-def generate_set(n):
-	# ... full implementation ...
-	return []
-
-if __name__ == '__main__':
-	s = generate_set(4)
-	print('cap set size=', len(s))
-```
---- FULL MODULE END ---
-
---- PATCH START ---
-<if also providing patch blocks>
---- PATCH END ---
-
-Notes for the LLM:
-- Full-module output is preferred. If you provide only a patch, also include the full module below the patch.
-- Explain your approach briefly in comments at the top of the file.
+* The evaluator will call generate_set(6).
+* Invalid cap sets score 0.
+* Larger valid cap sets score higher.
+* Simpler, more robust programs are preferred over fragile cleverness.
