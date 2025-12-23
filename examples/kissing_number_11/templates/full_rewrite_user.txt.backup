@@ -1,0 +1,177 @@
+## Context (for reference only)
+
+Performance metrics, prior attempts, and artifacts are provided for reference only.
+Do NOT explain them. Do NOT restate them.
+
+{metrics}
+{improvement_areas}
+{artifacts}
+{evolution_history}
+
+---
+
+## Current Program
+
+```{language}
+{current_program}
+```
+
+---
+
+## TASK (DO EXACTLY THIS)
+
+Return a COMPLETE replacement of the program source file.
+
+The program MUST define:
+
+```
+def get_C():
+```
+
+and MUST return a NON-EMPTY Python list of points.
+
+Each point:
+
+* is a list or tuple
+* has EXACTLY 11 coordinates
+* ALL coordinates are EXACT INTEGERS
+
+---
+
+## OBJECTIVE (ABSOLUTE PRIORITY)
+
+Maximize |C|, the number of points returned by get_C().
+
+If ANY constraint is violated, the solution is INVALID.
+A smaller VALID set is ALWAYS better than a larger INVALID one.
+
+---
+
+## HARD CONSTRAINTS (NO EXCEPTIONS)
+
+### C0: Integer-only geometry
+
+* Every coordinate MUST be an integer literal.
+* Floating-point values, fractions, or computed values are FORBIDDEN.
+
+### C1: Origin exclusion
+
+* The zero vector (0,0,0,0,0,0,0,0,0,0,0) MUST NOT appear in C.
+
+### C2: Global distance domination
+
+Let ||x|| denote the Euclidean norm.
+Define max_norm as:
+
+```
+max_norm = max(||x|| for x in C)
+```
+
+For EVERY pair of DISTINCT points x != y in C, it MUST hold that:
+
+```
+||x - y|| >= max_norm
+```
+
+This condition is GLOBAL and applies to ALL pairs.
+
+---
+
+## STRATEGY GUIDANCE (CRITICAL - READ CAREFULLY)
+
+This is a high-dimensional INTEGER feasibility problem.
+Do NOT assume spherical shells, angular separation, or uniform norms.
+
+Key facts implied by the constraints:
+
+* The distance constraint is equivalent to a squared-sum condition:
+
+  ```
+  for all x != y:
+      sum_i (x_i - y_i)^2 >= max_norm^2
+  ```
+
+  Large distances can be achieved by distributing squared differences
+  across MANY coordinates at once, not only by directional separation.
+
+* The value of max_norm may be determined by ONE or a very small number
+  of points. Most points in C do NOT need to have norm close to max_norm.
+
+* Valid solutions may be highly non-uniform, non-symmetric, and irregular.
+  Points do NOT need to form a clean geometric structure.
+  "Ugly but valid" integer constructions are acceptable and often superior.
+
+* Think in terms of combinatorial energy allocation in Z^11:
+  mixed signs, varied magnitudes, and multiple coordinates contributing
+  moderate differences whose squares sum to the required threshold.
+
+* Large integer magnitudes are useful because they allow finer-grained
+  allocation of squared differences under integer-only constraints,
+  not because of scaling or normalization.
+
+### SOTA HINTS (LEVERAGE KNOWN STRUCTURE)
+
+* A known high-quality set has **593 points** with:
+  - all norm R approximates 1e13 (all points nearly in a single sphere)
+  - min_pairwise approximates R (tight kissing condition)
+  - frequent angles: 60, 90, 120 degrees
+  - partial sign symmetry and near-zero centroid
+
+* Practical guidance:
+  - **Reuse or subset** points from the known set when unsure; even a large subset is valid.
+  - Keep norms roughly uniform (single radius) to satisfy the global constraint cleanly.
+  - Mix signs to keep centroid near the origin; avoid all-positive vectors.
+  - Prefer larger coordinates (e.g., around 1e12-1e13) to keep distances well above the threshold.
+  - Aim for a **large |C|** (e.g., larger than 100 if possible); avoid returning tiny sets unless necessary for validity.
+
+Avoid assuming:
+
+* a single spherical shell
+* angular or kissing-number intuition
+* sparsity or axis-aligned structure
+* symmetry or equal-radius designs
+
+Validity is binary. If unsure, return fewer points.
+
+---
+
+## OUTPUT FORMAT (STRICT)
+
+Return ONLY a single fenced Python code block containing a valid module.
+
+The module MUST:
+
+* define def get_C() at top level
+* return a non-empty Python list
+* use ONLY integer coordinates
+* NOT include the origin
+* include NO text outside the code block
+
+Any deviation results in INVALID output.
+
+---
+
+## FAILURE MODES (AUTOMATIC REJECTION)
+
+The output is INVALID if ANY of the following occur:
+
+* any coordinate is non-integer
+* any point has length != 11
+* the origin is included
+* any pair violates the distance constraint
+* more than one code block is present
+* any text appears outside the code block
+
+---
+
+## MINIMAL VALID EXAMPLE (NOT OPTIMAL)
+
+```python
+def get_C():
+    return [
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+```
+
+Return ONLY the program source code.

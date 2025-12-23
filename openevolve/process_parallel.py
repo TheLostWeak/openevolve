@@ -181,6 +181,12 @@ def _run_iteration_worker(
             program_artifacts=parent_artifacts,
             feature_dimensions=db_snapshot.get("feature_dimensions", []),
         )
+        logger.info(
+            "Iteration %s prompt (system then user):\n%s\n\n%s",
+            iteration,
+            prompt.get("system", ""),
+            prompt.get("user", ""),
+        )
 
         iteration_start = time.time()
 
@@ -198,7 +204,10 @@ def _run_iteration_worker(
 
         # Check for None response
         if llm_response is None:
-            return SerializableResult(error="LLM returned None response", iteration=iteration)
+            return SerializableResult(
+                error="LLM returned None response", iteration=iteration, prompt=prompt
+            )
+        logger.info("Iteration %s raw LLM response:\n%s", iteration, llm_response)
 
         # Parse response based on evolution mode
         if _worker_config.diff_based_evolution:
@@ -211,6 +220,7 @@ def _run_iteration_worker(
                 )
                 return SerializableResult(
                     error=f"No valid diffs found in response",
+                    prompt=prompt,
                     llm_response=llm_response,
                     iteration=iteration,
                 )
@@ -227,6 +237,7 @@ def _run_iteration_worker(
                 )
                 return SerializableResult(
                     error=f"No valid code found in response",
+                    prompt=prompt,
                     llm_response=llm_response,
                     iteration=iteration,
                 )
@@ -493,6 +504,20 @@ class ProcessParallelController:
                 timeout_seconds = self.config.evaluator.timeout + 30
                 result = future.result(timeout=timeout_seconds)
 
+                # Log prompt/response regardless of success so errors include context
+                prompt_obj = getattr(result, "prompt", None)
+                prompt_system = ""
+                prompt_user = ""
+                if isinstance(prompt_obj, dict):
+                    prompt_system = prompt_obj.get("system", "")
+                    prompt_user = prompt_obj.get("user", "")
+                elif prompt_obj is not None:
+                    prompt_system = str(prompt_obj)
+                logger.info("Iteration %s ORIGINAL PROMPT (system then user):", completed_iteration)
+                logger.info("%s\n\n%s", prompt_system, prompt_user)
+                logger.info("Iteration %s RAW LLM RESPONSE:", completed_iteration)
+                logger.info("%s", getattr(result, "llm_response", None))
+
                 if result.error:
                     # Persist prompt+response (and error) atomically for audit regardless of llm_response truthiness.
                     try:
@@ -556,6 +581,21 @@ class ProcessParallelController:
                 elif result.child_program_dict:
                     # Reconstruct program from dict
                     child_program = Program(**result.child_program_dict)
+
+                    # Log prompt and raw response in parent so it hits main log file
+                    if result.prompt:
+                        logger.info(
+                            "Iteration %s prompt (system then user):\n%s\n\n%s",
+                            completed_iteration,
+                            result.prompt.get("system", ""),
+                            result.prompt.get("user", ""),
+                        )
+                    if result.llm_response:
+                        logger.info(
+                            "Iteration %s raw LLM response:\n%s",
+                            completed_iteration,
+                            result.llm_response,
+                        )
 
                     # Add to database (will auto-inherit parent's island)
                     # No need to specify target_island - database will handle parent island inheritance
