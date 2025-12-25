@@ -1,27 +1,19 @@
 import itertools
 import random
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, List, Optional, Dict, Any, Set
 
-# Hard-coded dimension for this example. All generator code should use this value.
-CAP_N = 8
-
-# Fixed random seed for reproducibility.
+CAP_N = 6
 _RANDOM_SEED = 42
 
 
-def can_add(new_vec: Tuple[int, ...], existing_list: List[Tuple[int, ...]], existing_set: Optional[set] = None) -> bool:
-    """
-    Efficient incremental check for whether `new_vec` can be added to the
-    current cap set without violating the cap set property.
-
-    Returns:
-        True if `new_vec` can be added without creating a 3-term arithmetic
-        progression (mod 3), otherwise False.
-    """
+def can_add(
+    new_vec: Tuple[int, ...],
+    existing_list: List[Tuple[int, ...]],
+    existing_set: Optional[set] = None,
+) -> bool:
     if existing_set is None:
         existing_set = set(existing_list)
 
-    # Duplicate check
     if new_vec in existing_set:
         return False
 
@@ -34,18 +26,11 @@ def can_add(new_vec: Tuple[int, ...], existing_list: List[Tuple[int, ...]], exis
 
 
 class GreedyCapSetGenerator:
-    """
-    Class wrapper so LLMs can expose tunable parameters and search strategies.
-    The priority function is parameterized; a tuning hook can adjust weights
-    before building the final cap set.
-    """
-
     def __init__(self, n: int = CAP_N, params: Optional[Dict[str, Any]] = None):
         self.n = n
         self.params: Dict[str, Any] = {
-            # Fewer knobs for a lightweight demo; keep the interface intact.
             "balance_weight": 0.6,
-            "transition_penalty": 0.4,
+            "existing_penalty": 0.1,
             "random_noise": 0.02,
         }
         if params:
@@ -59,66 +44,122 @@ class GreedyCapSetGenerator:
             return None
         return optuna
 
-    def _priority(self, vec: Tuple[int, ...], params: Dict[str, Any], rng: random.Random) -> float:
+    def _compute_priorities(
+        self,
+        candidates: List[Tuple[int, ...]],
+        capset: List[Tuple[int, ...]],
+        params: Dict[str, Any],
+        rng: random.Random,
+    ) -> Dict[Tuple[int, ...], float]:
         """
-        Score a vector using only two simple signals so the demo stays easy to follow:
-        - how balanced the digit counts are (favoring even mixtures)
-        - how often identical digits appear back-to-back (penalizing long runs)
-        Small noise keeps ordering deterministic with the seeded RNG.
+        每轮只调用一次：把 candidates 中所有点的 priority 一次性算完并返回。
+        逻辑保持示范级简单：
+        - imbalance（点自身）
+        - existing_penalty * len(capset)（与已选集合的最弱耦合）
+        - 微噪声用于打平（可选）
         """
-        count0 = vec.count(0)
-        count1 = vec.count(1)
-        count2 = vec.count(2)
-        imbalance = abs(count0 - count1) + abs(count1 - count2) + abs(count0 - count2)
-        transitions = sum(1 for a, b in zip(vec, vec[1:]) if a == b)
+        priorities: Dict[Tuple[int, ...], float] = {}
 
-        score = -params["balance_weight"] * imbalance - params["transition_penalty"] * transitions
-        noise = params.get("random_noise", 0)
-        return score + (noise * rng.random() if noise else 0.0)
+        existing_term = params["existing_penalty"] * len(capset)
+        noise = params.get("random_noise", 0.0)
+        bw = params["balance_weight"]
 
-    def generate(self, params: Optional[Dict[str, Any]] = None, rng: Optional[random.Random] = None) -> List[Tuple[int, ...]]:
-        """
-        Greedy cap-set construction with a minimal priority function. The vector pool
-        is shuffled via the priority score to keep the demo deterministic yet simple.
-        """
+        for vec in candidates:
+            c0 = vec.count(0)
+            c1 = vec.count(1)
+            c2 = vec.count(2)
+            imbalance = abs(c0 - c1) + abs(c1 - c2) + abs(c0 - c2)
+
+            score = -bw * imbalance - existing_term
+            if noise:
+                score += noise * rng.random()
+
+            priorities[vec] = score
+
+        return priorities
+
+    def generate(
+        self,
+        params: Optional[Dict[str, Any]] = None,
+        rng: Optional[random.Random] = None,
+    ) -> List[Tuple[int, ...]]:
         if rng is None:
             rng = random.Random(_RANDOM_SEED)
+
         active_params = dict(self.params)
         if params:
             active_params.update(params)
 
         all_vectors = list(itertools.product([0, 1, 2], repeat=self.n))
-        sorted_vectors = sorted(all_vectors, key=lambda v: self._priority(v, active_params, rng), reverse=True)
 
         capset: List[Tuple[int, ...]] = []
-        capset_set = set()
+        capset_set: Set[Tuple[int, ...]] = set()
 
-        for vec in sorted_vectors:
-            if vec in capset_set:
-                continue
-            if can_add(vec, capset, capset_set):
-                capset.append(vec)
-                capset_set.add(vec)
+        # 动态贪心：每次选点后，重新计算所有候选点的 priority（但每轮只调用一次计算函数）
+        while True:
+            # 先收集本轮“可加入”的候选点
+            candidates: List[Tuple[int, ...]] = []
+            for vec in all_vectors:
+                if vec in capset_set:
+                    continue
+                if can_add(vec, capset, capset_set):
+                    candidates.append(vec)
+
+            if not candidates:
+                break
+
+            # 每轮只调用一次：批量计算 priority
+            priorities = self._compute_priorities(candidates, capset, active_params, rng)
+
+            # 再遍历取最大
+            best_vec = None
+            best_score = float("-inf")
+            for vec in candidates:
+                s = priorities[vec]
+                if s > best_score:
+                    best_score = s
+                    best_vec = vec
+
+            if best_vec is None:
+                break
+
+            capset.append(best_vec)
+            capset_set.add(best_vec)
 
         return capset
 
-    def tune_with_optuna(self, max_trials: int = 20, timeout: float = 8.0) -> Tuple[Dict[str, Any], Optional[List[Tuple[int, ...]]]]:
-        """
-        Simplified stub for demonstration: keep the interface but skip heavy tuning.
-        If Optuna is installed, we still avoid running it to keep runtime predictable.
-        """
-        return dict(self.params), self.generate(params=self.params, rng=random.Random(_RANDOM_SEED))
+    def tune_with_optuna(
+        self,
+        max_trials: int = 20,
+        timeout: float = 30.0,
+    ) -> Tuple[Dict[str, Any], List[Tuple[int, ...]]]:
+        optuna = self._try_import_optuna()
+        if optuna is None:
+            raise RuntimeError("Optuna is not installed. Please run: pip install optuna")
+
+        def objective(trial: Any) -> float:
+            sampled = {
+                "balance_weight": trial.suggest_float("balance_weight", 0.0, 2.0),
+                "existing_penalty": trial.suggest_float("existing_penalty", 0.0, 1.0),
+                "random_noise": trial.suggest_float("random_noise", 0.0, 0.05),
+            }
+            cap = self.generate(params=sampled, rng=random.Random(_RANDOM_SEED))
+            return float(len(cap))
+
+        study = optuna.create_study(
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(seed=_RANDOM_SEED),
+        )
+        study.optimize(objective, n_trials=max_trials, timeout=timeout)
+
+        best_params = dict(self.params)
+        best_params.update(study.best_params)
+        best_capset = self.generate(params=best_params, rng=random.Random(_RANDOM_SEED))
+        return best_params, best_capset
 
 
 def generate_set(n: int) -> List[Tuple[int, ...]]:
-    """
-    Wrapper used by the evaluator. Keeps CAP_N fixed, but exposes a tuning
-    hook that is safe when Optuna is missing.
-    """
     generator = GreedyCapSetGenerator(n=CAP_N)
-    best_params, tuned_capset = generator.tune_with_optuna(max_trials=15, timeout=6.0)
-    if tuned_capset is None:
-        # Optuna unavailable; fall back to deterministic greedy build.
-        return generator.generate(params=best_params)
+    best_params, tuned_capset = generator.tune_with_optuna(max_trials=100, timeout=30.0)
     return tuned_capset
 
