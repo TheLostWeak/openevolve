@@ -1,132 +1,108 @@
-You are allowed and encouraged to produce a complete, runnable Python module
-that constructs a large cap set in F_3^n.
+You are to produce or improve a complete, runnable Python module that
+constructs a large cap set in F_3^n using ONE fixed algorithmic structure.
 
-IMPORTANT: For this task, fix the dimension to n = 8.
+IMPORTANT:
+- The evaluator will call generate_set(8) exactly once.
+- Internal parameter tuning (e.g. Optuna) is allowed and encouraged.
+- Algorithmic structure MUST remain invariant across all trials.
 
-A cap set is a subset A of F_3^n such that there are no three *distinct*
+────────────────────────────────────────────────────────────
+PROBLEM
+────────────────────────────────────────────────────────────
+
+A cap set is a subset A of F_3^n such that there are no three distinct
 elements x, y, z in A with x + y + z ≡ 0 (mod 3) coordinate-wise.
 
-Your goal is to maximize |A|. Correctness is mandatory; larger sets score higher.
+Your goal is to maximize |A|. Correctness is mandatory.
 
-## REQUIREMENTS
+────────────────────────────────────────────────────────────
+CRITICAL DESIGN CONSTRAINTS (DO NOT VIOLATE)
+────────────────────────────────────────────────────────────
 
-- Output at least one COMPLETE, runnable Python file.
-- Encapsulate the core generator in a class exposing tunable parameters that
-  drive the priority/heuristic used by the construction.
+1. EXACTLY ONE algorithmic strategy.
+   - Do NOT switch between different construction paradigms.
+   - Do NOT introduce strategy-selection flags or categorical choices.
+   - Control flow and data structures must be identical in all runs.
 
-- The file must define:
+2. All tunable parameters MUST have stable semantics.
+   - Parameters may affect:
+       • scoring weights
+       • probabilities / noise levels
+       • thresholds / limits
+       • iteration counts
+   - Parameters MUST NOT:
+       • enable/disable large code paths
+       • select different algorithms
+       • change data representations
 
-    def generate_set(n) -> List[Tuple[int, ...]]
+3. If parameter tuning is used (e.g. Optuna):
+   - Trials MUST optimize the SAME objective function f(params).
+   - Prefer fewer parameters (≈4–7) with smooth influence.
+   - Prefer multi-seed averaging inside the objective to reduce noise.
 
-  which returns a cap set with entries in 0/1/2. For this task, the evaluator
-  will call generate_set(8).
+────────────────────────────────────────────────────────────
+STRUCTURE GUIDANCE (SOFT, NOT MANDATORY)
+────────────────────────────────────────────────────────────
 
-- The generate_set function SHOULD perform parameter tuning/selection to
-  improve the cap set size:
-  - If Optuna is available, run a deterministic Optuna study to tune the
-    generator’s parameters (seeded with _RANDOM_SEED, bounded trial count and/or
-    timeout).
-  - If Optuna is missing or fails to import, cleanly fall back to a deterministic
-    stdlib-only path (no external dependencies) so the module always runs.
+Good constructions typically involve:
+- A structured deterministic seed (e.g. product or symmetric construction)
+- Incremental greedy growth under a scoring heuristic
+- Limited local repair or swap-based augmentation
+- Strong determinism (fixed seeds, bounded runtime)
 
-- Prefer only Python standard library imports. If you choose to use Optuna,
-  wrap its import and usage so missing dependencies do not crash the module,
-  and keep a stdlib-only fallback path.
+Favor:
+- Strong initial structure + soft stochastic refinement
+- Local improvements over global rewrites
 
-- If randomness is used:
-  - Define a module-level constant `_RANDOM_SEED`
-  - Seed all RNGs deterministically
+Avoid:
+- Large explicit enumerations
+- Full backtracking over F_3^8
+- Unbounded or super-exponential search
 
-- Keep runtime bounded and predictable (e.g., fixed n_trials and/or timeout).
+────────────────────────────────────────────────────────────
+API REQUIREMENTS
+────────────────────────────────────────────────────────────
 
-## STRUCTURE-ORIENTED GUIDANCE
+The module MUST define:
 
-The evaluator prefers cap sets that display clear mathematical structure
-(for example: symmetry, regular block/tiling patterns, orbit decompositions,
-affine/subspace constructions, or other compact parametric families). When
-producing a solution, favor constructions that expose and exploit such
-structure rather than merely listing many individual vectors.
+    def generate_set(n: int) -> List[Tuple[int, ...]]
 
-Guidelines:
+- The evaluator will call generate_set(8).
+- The function must always return a valid cap set.
+- Runtime must be bounded and predictable.
 
-- **Prefer structural descriptions:** produce generators or parametric
-  constructions (rules, formulas, or small building blocks) that generate
-  the set, instead of embedding long explicit lists of vectors.
-- **Encourage symmetry and invariance:** constructions that are invariant
-  under coordinate permutations, cyclic shifts, or group actions are valuable.
-- **Use compact encodings:** describe the set as orbits, repeated tiles,
-  cartesian products, affine translates, or other compact encodings when
-  possible.
-- **Structure summary:** include a short bullet summary naming the key
-  structural features (e.g., "cyclic shifts of base block B", "decomposes
-  into 3 orbits under rotation", "product of smaller cap sets").
-- **Reproducibility:** if randomness is used, expose `_RANDOM_SEED` and make
-  default runs deterministic so the construction can be replayed.
+Encapsulate the construction in a class, e.g.:
 
-Examples of structural ideas (non-exhaustive and optional): coordinate-wise
-patterns, cyclic/group orbits, product constructions, affine-subspace
-restrictions, block-tilings, and parameterized templates.
+    class CapSetBuilder:
+        def __init__(self, params, seed):
+            ...
+        def build(self) -> List[int]:
+            ...
 
-Programs that provide a compact, structural description of the cap set and
-an accompanying short explanation of the invariants will be scored more
-favorably than programs that only output large enumerations.
+────────────────────────────────────────────────────────────
+DETERMINISM
+────────────────────────────────────────────────────────────
 
-## IMPLEMENTATION CONSTRAINTS (IMPORTANT)
+- Define a module-level constant _RANDOM_SEED.
+- Seed all RNGs deterministically.
+- Given identical parameters, output must be reproducible.
 
-- Keep runtime bounded and predictable.
-- Avoid super-exponential or unbounded loops.
-- If your approach is potentially expensive, introduce explicit limits such as:
+────────────────────────────────────────────────────────────
+DOCUMENTATION (LIGHTWEIGHT)
+────────────────────────────────────────────────────────────
 
-    MAX_ITERATIONS
-    MAX_RESTARTS
-    TIME_LIMIT_SECONDS
-    MAX_CANDIDATES
-- Must use Optuna, use deterministic samplers (seeded with `_RANDOM_SEED`)
-  and modest trial counts/timeouts to keep evaluation predictable.
+At the top of the file, briefly describe:
+- The fixed algorithmic idea
+- The meaning of each tunable parameter
 
-- Prefer incremental or local checks over full O(|A|^3) verification.
-  Useful ideas include:
-  - Precomputing forbidden third points
-  - Encoding vectors as base-3 integers
-  - Maintaining conflict counters
-  - Sampling candidate moves
+Do NOT include external references or excessive explanation.
 
-- When unsure, prefer a SMALL, SAFE modification over a full rewrite.
+────────────────────────────────────────────────────────────
+OUTPUT FORMAT
+────────────────────────────────────────────────────────────
 
-## OUTPUT FORMAT
-
-Return ONLY a full Python module, enclosed in:
+Return ONLY a complete Python module enclosed in:
 
 ```python
 <full module text>
 ````
-
-## DOCUMENTATION (LIGHTWEIGHT)
-
-At the top of the file, include brief comments explaining:
-
-* The high-level idea of your construction/search
-* Why this strategy might find larger cap sets
-
-Do NOT include external references or excessive explanation.
-
----
-
-## NOTES FOR THE MODEL
-
-* The evaluator will call generate_set(8).
-* Invalid cap sets score 0.
-* Larger valid cap sets score higher.
-* Simpler, more robust programs are preferred over fragile cleverness.
-
-- When using Optuna, strongly prefer TPESampler over RandomSampler.
-  The sampler should be deterministic (seeded with _RANDOM_SEED) and
-  leverage past trials to guide future sampling.
-
-- The total time budget for generate_set_for_eval is approximately 900 seconds.
-  Parameter tuning strategies may assume this upper bound, but must still
-  keep runtime bounded and predictable (e.g., fixed n_trials, per-trial
-  time limits, or staged tuning).
-
-- Increasing the number of Optuna trials is acceptable within the 900-second
-  budget, provided determinism and safe fallback behavior are preserved.
