@@ -72,6 +72,8 @@ async def run_iteration_with_shared_db(
             program_artifacts=parent_artifacts if parent_artifacts else None,
             feature_dimensions=database.config.feature_dimensions,
         )
+        logger.info("Iteration %s ORIGINAL PROMPT (system then user):", iteration)
+        logger.info("%s\n\n%s", prompt.get("system", ""), prompt.get("user", ""))
 
         result = Result(parent=parent)
         iteration_start = time.time()
@@ -81,6 +83,8 @@ async def run_iteration_with_shared_db(
             system_message=prompt["system"],
             messages=[{"role": "user", "content": prompt["user"]}],
         )
+        logger.info("Iteration %s RAW LLM RESPONSE:", iteration)
+        logger.info("%s", llm_response)
 
         # Parse the response
         if config.diff_based_evolution:

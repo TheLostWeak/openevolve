@@ -30,8 +30,9 @@ class OpenAILLM(LLMInterface):
         self.timeout = model_cfg.timeout
         self.retries = model_cfg.retries
         self.retry_delay = model_cfg.retry_delay
+        # Allow env fallback when config leaves api_key empty
         self.api_base = model_cfg.api_base
-        self.api_key = model_cfg.api_key
+        self.api_key = model_cfg.api_key or None
         self.random_seed = getattr(model_cfg, "random_seed", None)
         self.reasoning_effort = getattr(model_cfg, "reasoning_effort", None)
 
