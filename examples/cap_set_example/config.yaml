@@ -1,11 +1,11 @@
 llm:
   api_base: "https://openrouter.ai/api/v1"
   models:
-    - name: "openai/gpt-5.2"
+    # - name: "openai/gpt-5.2"
     # - name: "openai/gpt-5.1-codex-max"
     # - name: "deepseek/deepseek-v3.2-speciale"
     # - name: "meta-llama/llama-3.1-405b-instruct:free"
-    # - name: "qwen/qwen3-coder:free"
+    - name: "qwen/qwen3-coder:free"
       weight: 1.0
 
 database:
@@ -24,7 +24,7 @@ evaluator:
 prompt:
   template_dir: "examples/cap_set_example/templates"
 
-diff_based_evolution: false
+diff_based_evolution: true
 
 max_iterations: 200
 checkpoint_interval: 50

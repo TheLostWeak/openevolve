@@ -1,0 +1,58 @@
+# Task Specification (Diff Mode)
+Goal: improve the cap-set generator while keeping a single, greedy, priority-driven algorithm that grows a cap set in (F3^n) by adding points in descending priority order and skipping any that break the cap-set constraint.
+
+Critical rules:
+- Exactly one algorithmic structure; no mode switches, backtracking, swaps, or alternate strategies.
+- Start from the empty set, score all candidates, add valid points in priority order, stop when no candidate can be added.
+- Parameters may only tune scoring weights, smooth noise/tie-breaking, thresholds, or iteration counts; they must not alter control flow or data representation.
+- Optuna with `TPESampler` must run inside `generate_set` first, then the best params must drive one deterministic construction whose result is returned.
+- API: `def generate_set(n: int) -> List[Tuple[int, ...]]` (the evaluator will call `generate_set(8)`).
+- Determinism: define `_RANDOM_SEED` and seed all RNGs so identical params yield identical output.
+- Keep a brief header comment explaining the fixed idea and the meaning of each tunable parameter.
+
+# Current Program Status
+- Fitness: {fitness_score}
+- Feature coordinates: {feature_coords}
+- Metrics:
+{metrics}
+- Areas identified for improvement:
+{improvement_areas}
+
+{artifacts}
+
+# Program Evolution History
+{evolution_history}
+
+# Current Program
+```{language}
+{current_program}
+```
+
+# Required Output
+Suggest targeted improvements using the exact SEARCH/REPLACE diff format:
+
+<<<<<<< SEARCH
+# Exact code from the current program to replace (must match exactly)
+=======
+# New code
+>>>>>>> REPLACE
+
+Example:
+<<<<<<< SEARCH
+for i in range(m):
+    for j in range(p):
+        for k in range(n):
+            C[i, j] += A[i, k] * B[k, j]
+=======
+for i in range(m):
+    for k in range(n):
+        for j in range(p):
+            C[i, j] += A[i, k] * B[k, j]
+>>>>>>> REPLACE
+
+Rules:
+- SEARCH text must match the current program exactly; include full context needed for replacement.
+- You may include multiple diff blocks.
+- Preserve the greedy priority-driven structure and the single-strategy constraint while improving scoring, determinism, and Optuna tuning.
+- Do not rewrite the entire file; focus on minimal, high-impact changes.
+- Briefly explain why each change helps before or after the diff blocks.

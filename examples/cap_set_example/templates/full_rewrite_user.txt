@@ -1,108 +1,263 @@
-You are to produce or improve a complete, runnable Python module that
-constructs a large cap set in F_3^n using ONE fixed algorithmic structure.
+## TASK SPECIFICATION (FINAL, FULL VERSION)
 
-IMPORTANT:
-- The evaluator will call generate_set(8) exactly once.
-- Internal parameter tuning (e.g. Optuna) is allowed and encouraged.
-- Algorithmic structure MUST remain invariant across all trials.
+You are to produce or improve a **complete, runnable Python module** that constructs a large cap set in ( \mathbb{F}_3^n ) using **exactly one fixed algorithmic structure**.
 
-────────────────────────────────────────────────────────────
-PROBLEM
-────────────────────────────────────────────────────────────
+---
 
-A cap set is a subset A of F_3^n such that there are no three distinct
-elements x, y, z in A with x + y + z ≡ 0 (mod 3) coordinate-wise.
+### IMPORTANT
 
-Your goal is to maximize |A|. Correctness is mandatory.
+* The evaluator will call `generate_set(8)` **exactly once**.
+* **Internal parameter tuning via Optuna is mandatory**.
+* The **algorithmic structure must remain invariant** across all Optuna trials and runs.
 
-────────────────────────────────────────────────────────────
-CRITICAL DESIGN CONSTRAINTS (DO NOT VIOLATE)
-────────────────────────────────────────────────────────────
+---
 
-1. EXACTLY ONE algorithmic strategy.
-   - Do NOT switch between different construction paradigms.
-   - Do NOT introduce strategy-selection flags or categorical choices.
-   - Control flow and data structures must be identical in all runs.
+## ─────────────────────────────────────────────
 
-2. All tunable parameters MUST have stable semantics.
-   - Parameters may affect:
-       • scoring weights
-       • probabilities / noise levels
-       • thresholds / limits
-       • iteration counts
-   - Parameters MUST NOT:
-       • enable/disable large code paths
-       • select different algorithms
-       • change data representations
+## PROBLEM
 
-3. If parameter tuning is used (e.g. Optuna):
-   - Trials MUST optimize the SAME objective function f(params).
-   - Prefer fewer parameters (≈4–7) with smooth influence.
-   - Prefer multi-seed averaging inside the objective to reduce noise.
+## ─────────────────────────────────────────────
 
-────────────────────────────────────────────────────────────
-STRUCTURE GUIDANCE (SOFT, NOT MANDATORY)
-────────────────────────────────────────────────────────────
+A **cap set** is a subset ( A \subset \mathbb{F}_3^n ) such that there do **not** exist three **distinct** elements
+( x, y, z \in A ) satisfying:
 
-Good constructions typically involve:
-- A structured deterministic seed (e.g. product or symmetric construction)
-- Incremental greedy growth under a scoring heuristic
-- Limited local repair or swap-based augmentation
-- Strong determinism (fixed seeds, bounded runtime)
+[
+x + y + z \equiv 0 \pmod 3
+]
 
-Favor:
-- Strong initial structure + soft stochastic refinement
-- Local improvements over global rewrites
+coordinate-wise.
 
-Avoid:
-- Large explicit enumerations
-- Full backtracking over F_3^8
-- Unbounded or super-exponential search
+Your goal is to **maximize ( |A| )**.
+**Correctness is mandatory.**
 
-────────────────────────────────────────────────────────────
-API REQUIREMENTS
-────────────────────────────────────────────────────────────
+---
 
-The module MUST define:
+## ─────────────────────────────────────────────
 
-    def generate_set(n: int) -> List[Tuple[int, ...]]
+## CRITICAL DESIGN CONSTRAINTS (DO NOT VIOLATE)
 
-- The evaluator will call generate_set(8).
-- The function must always return a valid cap set.
-- Runtime must be bounded and predictable.
+## ─────────────────────────────────────────────
+
+### 1. EXACTLY ONE ALGORITHMIC STRATEGY
+
+* Do **NOT** switch between different construction paradigms.
+* Do **NOT** introduce strategy-selection flags, modes, or categorical choices.
+* Control flow, data structures, and representations **must be identical** in all runs and trials.
+
+---
+
+### 2. STABLE SEMANTICS FOR ALL PARAMETERS
+
+Tunable parameters may affect **only**:
+
+* Priority / scoring weights
+* Smooth stochastic noise or tie-breaking perturbations
+* Thresholds or numeric limits
+* Iteration or pass counts
+
+Parameters **MUST NOT**:
+
+* Enable or disable major code paths
+* Select between different algorithms
+* Change data representations or construction logic
+
+---
+
+### 3. PARAMETER TUNING REQUIREMENTS
+
+* All Optuna trials **must optimize the same objective function** ( f(\text{params}) ).
+* Prefer a **small number of parameters** (approximately 4–7) with smooth, continuous influence.
+* The objective function **may average results over multiple fixed random seeds** to reduce noise.
+
+---
+
+## ─────────────────────────────────────────────
+
+## STRUCTURE GUIDANCE (STRONG, SEMI-MANDATORY)
+
+## ─────────────────────────────────────────────
+
+The construction **MUST** strictly preserve the following **core algorithmic framework**:
+
+* **Start from the empty set** in ( \mathbb{F}_3^n ).
+* **Iteratively grow the cap set by greedy selection**, adding points one by one.
+* At each step, **all candidate points are assigned a priority score**.
+* The algorithm **always attempts to add points in descending priority order**, skipping those that violate the cap set constraint.
+* The construction **terminates when no further point can be added**.
+
+This greedy, priority-driven incremental construction is the **only permitted global control structure**.
+
+---
+
+### Allowed Degrees of Freedom
+
+*(ALL MUST RESPECT THE ABOVE FRAMEWORK)*
+
+Performance improvements are permitted **only through the design of the priority function**, including:
+
+* The **features** used to score candidate points
+  (e.g. coordinate statistics, symmetry indicators, interaction with the current set).
+* The **weights or coefficients** applied to these features.
+* Smooth stochastic perturbations or deterministic tie-breaking noise applied to priority scores.
+* Soft normalization, rescaling, or reweighting of priorities.
+* Limited implicit lookahead **expressed solely via priority adjustments**
+  (not via branching, backtracking, or alternative control flow).
+
+All such modifications **must preserve** the invariant:
+
+> **“Points are considered in a single global order determined entirely by their priority score.”**
+
+---
+
+### Explicitly Forbidden Modifications
+
+The following are **strictly prohibited**:
+
+* Introducing any non-empty structured seed (e.g. product or algebraic constructions).
+* Performing swaps, removals, rollbacks, or backtracking of previously added points.
+* Running multiple independent constructions and selecting the best result.
+* Switching between different construction strategies.
+* Any control flow that conditionally changes the algorithmic paradigm.
+
+---
+
+### Design Philosophy
+
+The intended design philosophy is:
+
+> **One fixed greedy algorithm, whose power comes entirely from a well-designed priority function.**
+
+All learning, tuning, and experimentation should focus on:
+
+* Designing expressive yet stable priority features.
+* Calibrating their parameters.
+* Understanding how priority choices shape the final cap set.
+
+---
+
+## ─────────────────────────────────────────────
+
+## PARAMETER TUNING REQUIREMENT (MANDATORY)
+
+## ─────────────────────────────────────────────
+
+The algorithm **MUST use Optuna for automatic parameter tuning**, and it **may assume that Optuna is always available** in the execution environment.
+
+No fallback implementation for the absence of Optuna is required.
+
+Mandatory requirements:
+
+* All tunable parameters **MUST be provided by Optuna trials**.
+* All trials **MUST execute the identical algorithmic structure** described above.
+* All trials **MUST optimize the same objective function**, whose primary goal is maximizing the final cap set size.
+* Optuna **MUST use the TPE sampler** (`optuna.samplers.TPESampler`).
+* Optuna **MUST NOT** be used for:
+
+  * Algorithm or strategy selection
+  * Enabling or disabling functionality
+  * Switching construction paradigms
+
+Within `generate_set`:
+
+* A **bounded Optuna study** (by trial count or time limit) **MUST be executed first**.
+* The **best trial’s parameters** MUST then be used to run **one final deterministic construction**.
+* The cap set produced by this final run **MUST be returned**.
+
+---
+
+## ─────────────────────────────────────────────
+
+## API REQUIREMENTS
+
+## ─────────────────────────────────────────────
+
+The module **MUST** define:
+
+```python
+def generate_set(n: int) -> List[Tuple[int, ...]]
+```
+
+* The evaluator will call `generate_set(8)`.
+* The function must always return a **valid cap set**.
+* Runtime must be **bounded and predictable**.
 
 Encapsulate the construction in a class, e.g.:
 
-    class CapSetBuilder:
-        def __init__(self, params, seed):
-            ...
-        def build(self) -> List[int]:
-            ...
+```python
+class CapSetBuilder:
+    def __init__(self, params, seed):
+        ...
+    def build(self) -> List[int]:
+        ...
+```
 
-────────────────────────────────────────────────────────────
-DETERMINISM
-────────────────────────────────────────────────────────────
+---
 
-- Define a module-level constant _RANDOM_SEED.
-- Seed all RNGs deterministically.
-- Given identical parameters, output must be reproducible.
+## ─────────────────────────────────────────────
 
-────────────────────────────────────────────────────────────
-DOCUMENTATION (LIGHTWEIGHT)
-────────────────────────────────────────────────────────────
+## DETERMINISM
+
+## ─────────────────────────────────────────────
+
+* Define a module-level constant `_RANDOM_SEED`.
+* Seed all RNGs deterministically.
+* Given identical parameters, output **must be reproducible**.
+
+---
+
+## ─────────────────────────────────────────────
+
+## DOCUMENTATION (LIGHTWEIGHT)
+
+## ─────────────────────────────────────────────
 
 At the top of the file, briefly describe:
-- The fixed algorithmic idea
-- The meaning of each tunable parameter
 
-Do NOT include external references or excessive explanation.
+* The fixed algorithmic idea
+* The meaning of each tunable parameter
 
-────────────────────────────────────────────────────────────
-OUTPUT FORMAT
-────────────────────────────────────────────────────────────
+Do **NOT** include external references or excessive explanation.
 
-Return ONLY a complete Python module enclosed in:
+---
+
+## ─────────────────────────────────────────────
+
+## OUTPUT FORMAT
+
+## ─────────────────────────────────────────────
+
+Return **ONLY** a complete Python module enclosed in:
 
 ```python
 <full module text>
-````
+```
+
+---
+
+## ─────────────────────────────────────────────
+
+## CURRENT PROGRAM CONTEXT (FILLED BY SYSTEM)
+
+## ─────────────────────────────────────────────
+
+Parent program code (base to improve):
+```python
+{current_program}
+```
+
+Metrics / fitness:
+- {metrics}
+- fitness_score: {fitness_score}
+- feature_coords: {feature_coords}
+
+Recent evolution highlights:
+{improvement_areas}
+
+Top/diverse attempts from this island:
+{evolution_history}
+
+Inspirations (same island):
+{inspirations}
+
+Artifacts (if available):
+{artifacts}
