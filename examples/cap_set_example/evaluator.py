@@ -22,7 +22,7 @@ import traceback
 from typing import Dict, Any, Tuple, Optional, Set, List
 
 def _get_n_from_env_or_config(program_path: str) -> int:
-    return 6
+    return 8
 
 
 def _get_timeout_from_env_or_config(program_path: str) -> int:

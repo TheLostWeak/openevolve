@@ -21,8 +21,6 @@ evaluator:
   max_retries: 1
   cascade_evaluation: false
 
-cap_n: 6
-
 prompt:
   template_dir: "examples/cap_set_example/templates"
 
@@ -38,3 +36,8 @@ evolution_trace:
   format: jsonl
   output_path: "examples/cap_set_example/openevolve_trace.jsonl"
   buffer_size: 10
+
+max_code_length: 60000
+
+evaluator:
+  timeout: 900  # 秒

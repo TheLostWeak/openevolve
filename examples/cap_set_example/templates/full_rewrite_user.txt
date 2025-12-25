@@ -1,7 +1,7 @@
 You are allowed and encouraged to produce a complete, runnable Python module
 that constructs a large cap set in F_3^n.
 
-IMPORTANT: For this task, fix the dimension to n = 6.
+IMPORTANT: For this task, fix the dimension to n = 8.
 
 A cap set is a subset A of F_3^n such that there are no three *distinct*
 elements x, y, z in A with x + y + z ≡ 0 (mod 3) coordinate-wise.
@@ -11,17 +11,33 @@ Your goal is to maximize |A|. Correctness is mandatory; larger sets score higher
 ## REQUIREMENTS
 
 - Output at least one COMPLETE, runnable Python file.
+- Encapsulate the core generator in a class exposing tunable parameters that
+  drive the priority/heuristic used by the construction.
+
 - The file must define:
 
     def generate_set(n) -> List[Tuple[int, ...]]
 
-  which returns a cap set with entries in 0/1/2.
+  which returns a cap set with entries in 0/1/2. For this task, the evaluator
+  will call generate_set(8).
 
-- Only Python standard library imports are allowed.
+- The generate_set function SHOULD perform parameter tuning/selection to
+  improve the cap set size:
+  - If Optuna is available, run a deterministic Optuna study to tune the
+    generator’s parameters (seeded with _RANDOM_SEED, bounded trial count and/or
+    timeout).
+  - If Optuna is missing or fails to import, cleanly fall back to a deterministic
+    stdlib-only path (no external dependencies) so the module always runs.
+
+- Prefer only Python standard library imports. If you choose to use Optuna,
+  wrap its import and usage so missing dependencies do not crash the module,
+  and keep a stdlib-only fallback path.
 
 - If randomness is used:
   - Define a module-level constant `_RANDOM_SEED`
   - Seed all RNGs deterministically
+
+- Keep runtime bounded and predictable (e.g., fixed n_trials and/or timeout).
 
 ## STRUCTURE-ORIENTED GUIDANCE
 
@@ -65,6 +81,8 @@ favorably than programs that only output large enumerations.
     MAX_RESTARTS
     TIME_LIMIT_SECONDS
     MAX_CANDIDATES
+- Must use Optuna, use deterministic samplers (seeded with `_RANDOM_SEED`)
+  and modest trial counts/timeouts to keep evaluation predictable.
 
 - Prefer incremental or local checks over full O(|A|^3) verification.
   Useful ideas include:
@@ -96,7 +114,19 @@ Do NOT include external references or excessive explanation.
 
 ## NOTES FOR THE MODEL
 
-* The evaluator will call generate_set(6).
+* The evaluator will call generate_set(8).
 * Invalid cap sets score 0.
 * Larger valid cap sets score higher.
 * Simpler, more robust programs are preferred over fragile cleverness.
+
+- When using Optuna, strongly prefer TPESampler over RandomSampler.
+  The sampler should be deterministic (seeded with _RANDOM_SEED) and
+  leverage past trials to guide future sampling.
+
+- The total time budget for generate_set_for_eval is approximately 900 seconds.
+  Parameter tuning strategies may assume this upper bound, but must still
+  keep runtime bounded and predictable (e.g., fixed n_trials, per-trial
+  time limits, or staged tuning).
+
+- Increasing the number of Optuna trials is acceptable within the 900-second
+  budget, provided determinism and safe fallback behavior are preserved.
