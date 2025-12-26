@@ -710,8 +710,19 @@ class ProcessParallelController:
                     # If evaluator returned an error string inside metrics (e.g., syntax error),
                     # log the LLM response for debugging if available.
                     try:
+                        # Allow known string bookkeeping fields; flag others.
+                        _allowed_string_keys = {
+                            "artifact_path",
+                            "generator_stdout_artifact",
+                            "generator_stderr_artifact",
+                            "stdout_artifact",
+                            "stderr_artifact",
+                        }
                         has_string_metric = any(
-                            isinstance(v, str) and v for v in child_program.metrics.values()
+                            isinstance(v, str)
+                            and v
+                            and k not in _allowed_string_keys
+                            for k, v in child_program.metrics.items()
                         )
                     except Exception:
                         has_string_metric = False

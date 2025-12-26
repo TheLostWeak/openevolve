@@ -43,6 +43,11 @@ You must use **one single, fixed greedy algorithm** with the following structure
 > The global ordering of candidates is computed **once** and never changed.
 > No dynamic reordering or adaptive behavior is allowed.
 
+Feel free to be bold and creative when designing the priority scoring function.
+As long as it depends only on intrinsic properties of each point, unconventional or nonlinear features are encouraged.
+Do not hesitate to explore aggressive heuristics or randomized components.
+Performance gains take precedence over interpretability in the scoring design.
+
 ---
 
 
