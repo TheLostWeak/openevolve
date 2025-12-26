@@ -1,259 +1,116 @@
-## TASK SPECIFICATION (FINAL, FULL VERSION)
 
-You are to produce or improve a **complete, runnable Python module** that constructs a large cap set in ( \mathbb{F}_3^n ) using **exactly one fixed algorithmic structure**.
+# TASK SPECIFICATION (SIMPLIFIED, FINAL VERSION)
 
----
-
-### IMPORTANT
-
-* The evaluator will call `generate_set(8)` **exactly once**.
-* **Internal parameter tuning via Optuna is mandatory**.
-* The **algorithmic structure must remain invariant** across all Optuna trials and runs.
+You must produce a **complete, runnable Python module** that constructs a large **cap set** in  
+𝔽₃ⁿ using **one fixed algorithmic structure**.
 
 ---
 
-## ─────────────────────────────────────────────
+## 1. Problem Definition
 
-## PROBLEM
+A **cap set** is a subset A ⊆ 𝔽₃ⁿ such that there exist **no three distinct elements**
+x, y, z ∈ A satisfying:
 
-## ─────────────────────────────────────────────
+    x + y + z ≡ 0 (mod 3)
 
-A **cap set** is a subset ( A \subset \mathbb{F}_3^n ) such that there do **not** exist three **distinct** elements
-( x, y, z \in A ) satisfying:
-
-[
-x + y + z \equiv 0 \pmod 3
-]
-
-coordinate-wise.
-
-Your goal is to **maximize ( |A| )**.
-**Correctness is mandatory.**
+The goal is to **maximize |A|**, while guaranteeing correctness.
 
 ---
 
-## ─────────────────────────────────────────────
+## 2. Evaluation Constraints
 
-## CRITICAL DESIGN CONSTRAINTS (DO NOT VIOLATE)
-
-## ─────────────────────────────────────────────
-
-### 1. EXACTLY ONE ALGORITHMIC STRATEGY
-
-* Do **NOT** switch between different construction paradigms.
-* Do **NOT** introduce strategy-selection flags, modes, or categorical choices.
-* Control flow, data structures, and representations **must be identical** in all runs and trials.
+- The evaluator will call **`generate_set(8)` exactly once**.
+- Runtime must be bounded and predictable.
+- Output must always be a valid cap set.
 
 ---
 
-### 2. STABLE SEMANTICS FOR ALL PARAMETERS
+## 3. Mandatory Algorithmic Structure (Strict)
 
-Tunable parameters may affect **only**:
+You must use **one single, fixed greedy algorithm** with the following structure:
 
-* Priority / scoring weights
-* Smooth stochastic noise or tie-breaking perturbations
-* Thresholds or numeric limits
-* Iteration or pass counts
+1. Start from the empty set.
+2. **Before construction**, compute a priority score for *every* candidate point.
+   - The score must depend **only on intrinsic properties** of the point.
+3. Sort all candidates **once** by this score (descending).
+4. Iterate through the sorted list:
+   - Add a point if doing so preserves the cap-set property.
+   - Otherwise skip it.
+5. Return the final set.
 
-Parameters **MUST NOT**:
+### Absolute Invariant
 
-* Enable or disable major code paths
-* Select between different algorithms
-* Change data representations or construction logic
-
----
-
-### 3. PARAMETER TUNING REQUIREMENTS
-
-* All Optuna trials **must optimize the same objective function** ( f(\text{params}) ).
-* Prefer a **small number of parameters** (approximately 4–7) with smooth, continuous influence.
-* The objective function **may average results over multiple fixed random seeds** to reduce noise.
+> The global ordering of candidates is computed **once** and never changed.
+> No dynamic reordering or adaptive behavior is allowed.
 
 ---
 
-## STRUCTURE GUIDANCE (STRONG, SEMI-MANDATORY)
 
-The construction **MUST** strictly preserve the following **core algorithmic framework**, which is **invariant across all runs and all Optuna trials**:
 
-* **Start from the empty set** in ( \mathbb{F}_3^n ).
-* **Iteratively grow the cap set by greedy selection**, adding points one at a time.
-* Before selection begins:
-  * **All candidate points are assigned a priority score once**, computed from features that do **not** depend on the current cap set (intrinsic-only features).
-  * This global priority ordering is computed a single time at the start and is then used unchanged throughout the construction.
-* The algorithm **scans candidates in descending priority order**, selecting the highest-priority candidate that does not violate the cap set constraint and permanently adding it.
-* The process continues by advancing through the precomputed priority order until no further candidate can be added without violating the cap set property.
+## 4. Mandatory Use of Optuna
 
-This **single-pass, fixed-order greedy construction** is the **only permitted global control structure**.
+Inside `generate_set`, you **must**:
 
----
+1. Run an Optuna study using `TPESampler`.
+2. Optimize parameters that affect only the scoring function.
+3. Use the best parameters to perform **one final construction**.
+4. Return the resulting cap set.
 
-### Core Invariant
-
-Before selection begins, the following invariant **MUST hold**:
-
-> **“All candidate points are totally ordered by a priority function that is computed once at the start and depends only on intrinsic features and fixed tunable parameters (no dependence on the evolving cap set).”**
-
-The algorithm **MUST NOT** recompute or modify this ordering during construction; any incremental updates that alter the global order are forbidden.
+Constraints:
+- All trials must run the same algorithm.
+- No structural changes per trial.
+- Recommended:
+  - `max_trials ≈ 300`
+  - `timeout ≥ 180 seconds`
 
 ---
 
-### Allowed Degrees of Freedom
+## 5. Required API
 
-*(ALL MUST RESPECT THE ABOVE FRAMEWORK)*
-
-Performance improvements are permitted **only through the design of the priority function**, including (but limited to):
-
-* The **features** used to score candidate points
-  (e.g. coordinate statistics, symmetry indicators). **Features must be intrinsic and must not depend on the current evolving cap set.**
-* The **weights or coefficients** applied to these features.
-* Smooth stochastic perturbations or deterministic noise used solely for tie-breaking.
-* Soft normalization, rescaling, or reweighting of priority scores.
-* Limited implicit lookahead **expressed exclusively through the intrinsic priority computation**,
-  not via branching, backtracking, or alternative control flow.
-
-All such modifications **MUST preserve** the invariant that:
-
-> **“A single global order is computed once at the start and used unchanged throughout the construction.”**
-
----
-
-### Explicitly Forbidden Modifications
-
-The following are **strictly prohibited**:
-
-* Dynamically recomputing or reordering priorities during construction based on the current cap set.
-* Incrementally updating priorities in a way that changes the initial global order.
-* Introducing multiple construction phases, passes, or modes.
-* Performing swaps, removals, rollbacks, or backtracking of previously added points.
-* Running multiple independent constructions and selecting the best result.
-* Switching between different construction strategies or paradigms.
-* Any control flow that conditionally alters the algorithmic structure.
-
----
-
-### Design Philosophy
-
-The intended design philosophy is:
-
-> **One fixed greedy algorithm, whose expressive power comes entirely from a state-dependent priority function that is recomputed after every selection.**
-
-All learning, tuning, and experimentation should therefore focus on:
-
-* Designing priority features that meaningfully capture interactions with the current cap set.
-* Calibrating their parameters via smooth, continuous optimization.
-* Understanding how dynamic priority recomputation shapes the growth trajectory of the cap set.
-
-## ─────────────────────────────────────────────
-
-## PARAMETER TUNING REQUIREMENT (MANDATORY)
-
-## ─────────────────────────────────────────────
-
-The algorithm **MUST use Optuna for automatic parameter tuning**, and it **may assume that Optuna is always available** in the execution environment.
-
-No fallback implementation for the absence of Optuna is required.
-
-Mandatory requirements:
-
-* All tunable parameters **MUST be provided by Optuna trials**.
-* All trials **MUST execute the identical algorithmic structure** described above.
-* All trials **MUST optimize the same objective function**, whose primary goal is maximizing the final cap set size.
-* Optuna **MUST use the TPE sampler** (`optuna.samplers.TPESampler`).
-* Optuna **MUST NOT** be used for:
-
-  * Algorithm or strategy selection
-  * Enabling or disabling functionality
-  * Switching construction paradigms
-
-Within `generate_set`:
-
-* A **bounded Optuna study** (by trial count or time limit) **MUST be executed first**.
-* The **best trial’s parameters** MUST then be used to run **one final deterministic construction**.
-* The cap set produced by this final run **MUST be returned**.
-
-**Note:** When using a time limit for the Optuna study, use at least **180 seconds (3 minutes)** for `timeout` to allow meaningful trials to complete on the full-size problem. Shorter timeouts (e.g., 30s) are unlikely to permit even a single complete evaluation for the full `n=8` generation.
-
-Recommended tuning parameters for this example:
-
-- **max_trials**: 300
-- **timeout**: 180 (seconds)
-
-Example call pattern inside `generate_set`:
+Your module must define:
 
 ```python
-best_params, tuned_capset = generator.tune_with_optuna(max_trials=300, timeout=180.0)
-```
+def generate_set(n: int) -> List[Tuple[int, ...]]:
+````
 
----
-
-## ─────────────────────────────────────────────
-
-## API REQUIREMENTS
-
-## ─────────────────────────────────────────────
-
-The module **MUST** define:
-
-```python
-def generate_set(n: int) -> List[Tuple[int, ...]]
-```
-
-* The evaluator will call `generate_set(8)`.
-* The function must always return a **valid cap set**.
-* Runtime must be **bounded and predictable**.
-
-Encapsulate the construction in a class, e.g.:
+You may optionally structure code as:
 
 ```python
 class CapSetBuilder:
     def __init__(self, params, seed):
         ...
-    def build(self) -> List[int]:
+    def build(self) -> List[Tuple[int, ...]]:
         ...
 ```
 
 ---
 
-## ─────────────────────────────────────────────
+## 6. Determinism
 
-## DETERMINISM
-
-## ─────────────────────────────────────────────
-
-* Define a module-level constant `_RANDOM_SEED`.
-* Seed all RNGs deterministically.
-* Given identical parameters, output **must be reproducible**.
+* Define a module-level `_RANDOM_SEED`
+* Seed all randomness from it
+* Identical parameters must always produce identical output
 
 ---
 
-## ─────────────────────────────────────────────
-
-## DOCUMENTATION (LIGHTWEIGHT)
-
-## ─────────────────────────────────────────────
+## 7. Minimal Documentation
 
 At the top of the file, briefly describe:
 
-* The fixed algorithmic idea
+* The fixed greedy algorithm
 * The meaning of each tunable parameter
 
-Do **NOT** include external references or excessive explanation.
+No extra commentary or references.
 
 ---
 
-## ─────────────────────────────────────────────
+## 8. Output Format
 
-## OUTPUT FORMAT
-
-## ─────────────────────────────────────────────
-
-Return **ONLY** a complete Python module enclosed in:
+Return **only** a complete Python module:
 
 ```python
-<full module text>
+<full module code>
 ```
-
----
 
 ## ─────────────────────────────────────────────
 
