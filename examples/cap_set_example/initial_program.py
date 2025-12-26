@@ -47,31 +47,33 @@ class GreedyCapSetGenerator:
     def _compute_priorities(
         self,
         candidates: List[Tuple[int, ...]],
-        capset: List[Tuple[int, ...]],
         params: Dict[str, Any],
         rng: random.Random,
     ) -> Dict[Tuple[int, ...], float]:
         """
-        Compute priorities for all candidates once per round and return them.
+        Compute intrinsic priorities for candidates.
 
-        Simple, example-level scoring that combines:
-        - imbalance (intrinsic to the vector)
-        - existing_penalty * len(capset) (weak coupling to already-selected set)
-        - small random noise for tie-breaking (optional)
+        This priority function intentionally does NOT depend on the current
+        `capset`. It scores each candidate using only features intrinsic to
+        the vector (e.g. coordinate imbalance) and optional random noise.
+
+        The generator will compute these priorities once at the start,
+        sort candidates by priority, then greedily attempt to add each
+        candidate in order if it does not violate the cap set constraint.
         """
         priorities: Dict[Tuple[int, ...], float] = {}
 
-        existing_term = params["existing_penalty"] * len(capset)
         noise = params.get("random_noise", 0.0)
-        bw = params["balance_weight"]
+        bw = params.get("balance_weight", 0.6)
 
         for vec in candidates:
+            # Intrinsic imbalance score (lower imbalance preferred)
             c0 = vec.count(0)
             c1 = vec.count(1)
             c2 = vec.count(2)
             imbalance = abs(c0 - c1) + abs(c1 - c2) + abs(c0 - c2)
 
-            score = -bw * imbalance - existing_term
+            score = -bw * imbalance
             if noise:
                 score += noise * rng.random()
 
@@ -96,44 +98,25 @@ class GreedyCapSetGenerator:
         capset: List[Tuple[int, ...]] = []
         capset_set: Set[Tuple[int, ...]] = set()
 
-        # Dynamic greedy: after adding a point, recompute priorities for all
-        # candidates. The priority computation function is called once per round.
-        while True:
-            # First collect this round's candidates that can be added
-            candidates: List[Tuple[int, ...]] = []
-            for vec in all_vectors:
-                if vec in capset_set:
-                    continue
-                if can_add(vec, capset, capset_set):
-                    candidates.append(vec)
+        # Compute priorities once at the start without depending on the
+        # currently selected cap set. Then greedily iterate the sorted list
+        # and add any vector that preserves the cap-set property.
+        candidates: List[Tuple[int, ...]] = [v for v in all_vectors]
+        priorities = self._compute_priorities(candidates, active_params, rng)
+        sorted_candidates = sorted(candidates, key=lambda v: priorities.get(v, float("-inf")), reverse=True)
 
-            if not candidates:
-                break
-
-            # Compute priorities in batch (called once per round)
-            priorities = self._compute_priorities(candidates, capset, active_params, rng)
-
-            # Then scan to pick the highest-scoring candidate
-            best_vec = None
-            best_score = float("-inf")
-            for vec in candidates:
-                s = priorities[vec]
-                if s > best_score:
-                    best_score = s
-                    best_vec = vec
-
-            if best_vec is None:
-                break
-
-            capset.append(best_vec)
-            capset_set.add(best_vec)
+        # Greedily accept vectors in sorted order if they keep the cap property
+        for vec in sorted_candidates:
+            if can_add(vec, capset, capset_set):
+                capset.append(vec)
+                capset_set.add(vec)
 
         return capset
 
     def tune_with_optuna(
         self,
-        max_trials: int = 20,
-        timeout: float = 30.0,
+        max_trials: int = 200,
+        timeout: float = 180.0,
     ) -> Tuple[Dict[str, Any], List[Tuple[int, ...]]]:
         optuna = self._try_import_optuna()
         if optuna is None:
@@ -161,7 +144,8 @@ class GreedyCapSetGenerator:
 
 
 def generate_set(n: int) -> List[Tuple[int, ...]]:
-    generator = GreedyCapSetGenerator(n=CAP_N)
-    best_params, tuned_capset = generator.tune_with_optuna(max_trials=100, timeout=30.0)
+    """Entry point called by the evaluator: run tuning then return best cap set."""
+    generator = GreedyCapSetGenerator(n=n)
+    best_params, tuned_capset = generator.tune_with_optuna(max_trials=200, timeout=180.0)
     return tuned_capset
 

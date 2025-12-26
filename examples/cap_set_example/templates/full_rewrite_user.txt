@@ -77,26 +77,23 @@ The construction **MUST** strictly preserve the following **core algorithmic fra
 
 * **Start from the empty set** in ( \mathbb{F}_3^n ).
 * **Iteratively grow the cap set by greedy selection**, adding points one at a time.
-* At each iteration:
+* Before selection begins:
+  * **All candidate points are assigned a priority score once**, computed from features that do **not** depend on the current cap set (intrinsic-only features).
+  * This global priority ordering is computed a single time at the start and is then used unchanged throughout the construction.
+* The algorithm **scans candidates in descending priority order**, selecting the highest-priority candidate that does not violate the cap set constraint and permanently adding it.
+* The process continues by advancing through the precomputed priority order until no further candidate can be added without violating the cap set property.
 
-  * The algorithm maintains a **current partial cap set**, consisting of all points selected so far.
-  * **All remaining candidate points are assigned a priority score**, where the priority function **explicitly depends on the current cap set**.
-  * **Priority scores MUST be recomputed from scratch at every iteration**, fully reflecting the updated state after the most recently added point.
-* The algorithm **selects the candidate point with the highest priority score** that does not violate the cap set constraint.
-* The selected point is **permanently added** to the cap set.
-* The construction **terminates when no further candidate point can be added** without violating the cap set property.
-
-This **state-dependent, dynamically re-evaluated greedy construction** is the **only permitted global control structure**.
+This **single-pass, fixed-order greedy construction** is the **only permitted global control structure**.
 
 ---
 
 ### Core Invariant
 
-At every iteration, the following invariant **MUST hold**:
+Before selection begins, the following invariant **MUST hold**:
 
-> **“All candidate points are totally ordered by a priority function that is recomputed based solely on the current cap set and fixed tunable parameters.”**
+> **“All candidate points are totally ordered by a priority function that is computed once at the start and depends only on intrinsic features and fixed tunable parameters (no dependence on the evolving cap set).”**
 
-The algorithm **MUST NOT** reuse, cache, incrementally update, or partially preserve priority scores across iterations, unless such behavior is **semantically equivalent to a full recomputation** under the same priority definition.
+The algorithm **MUST NOT** recompute or modify this ordering during construction; any incremental updates that alter the global order are forbidden.
 
 ---
 
@@ -104,19 +101,19 @@ The algorithm **MUST NOT** reuse, cache, incrementally update, or partially pres
 
 *(ALL MUST RESPECT THE ABOVE FRAMEWORK)*
 
-Performance improvements are permitted **only through the design of the priority function**, including:
+Performance improvements are permitted **only through the design of the priority function**, including (but limited to):
 
 * The **features** used to score candidate points
-  (e.g. coordinate statistics, symmetry indicators, or interactions with the current cap set).
+  (e.g. coordinate statistics, symmetry indicators). **Features must be intrinsic and must not depend on the current evolving cap set.**
 * The **weights or coefficients** applied to these features.
 * Smooth stochastic perturbations or deterministic noise used solely for tie-breaking.
 * Soft normalization, rescaling, or reweighting of priority scores.
-* Limited implicit lookahead **expressed exclusively through priority computation**,
+* Limited implicit lookahead **expressed exclusively through the intrinsic priority computation**,
   not via branching, backtracking, or alternative control flow.
 
 All such modifications **MUST preserve** the invariant that:
 
-> **“Each iteration considers candidate points in a single global order fully determined by freshly computed priority scores.”**
+> **“A single global order is computed once at the start and used unchanged throughout the construction.”**
 
 ---
 
@@ -124,8 +121,8 @@ All such modifications **MUST preserve** the invariant that:
 
 The following are **strictly prohibited**:
 
-* Fixing, precomputing, or caching a global priority order that is reused across iterations.
-* Incrementally updating priorities in a manner that depends on historical ordering rather than full recomputation.
+* Dynamically recomputing or reordering priorities during construction based on the current cap set.
+* Incrementally updating priorities in a way that changes the initial global order.
 * Introducing multiple construction phases, passes, or modes.
 * Performing swaps, removals, rollbacks, or backtracking of previously added points.
 * Running multiple independent constructions and selecting the best result.
@@ -173,6 +170,19 @@ Within `generate_set`:
 * A **bounded Optuna study** (by trial count or time limit) **MUST be executed first**.
 * The **best trial’s parameters** MUST then be used to run **one final deterministic construction**.
 * The cap set produced by this final run **MUST be returned**.
+
+**Note:** When using a time limit for the Optuna study, use at least **180 seconds (3 minutes)** for `timeout` to allow meaningful trials to complete on the full-size problem. Shorter timeouts (e.g., 30s) are unlikely to permit even a single complete evaluation for the full `n=8` generation.
+
+Recommended tuning parameters for this example:
+
+- **max_trials**: 200
+- **timeout**: 180 (seconds)
+
+Example call pattern inside `generate_set`:
+
+```python
+best_params, tuned_capset = generator.tune_with_optuna(max_trials=200, timeout=180.0)
+```
 
 ---
 
