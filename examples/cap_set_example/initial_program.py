@@ -65,6 +65,7 @@ class GreedyCapSetGenerator:
 
         noise = params.get("random_noise", 0.0)
         bw = params.get("balance_weight", 0.6)
+        ep = params.get("existing_penalty", 0.0)
 
         for vec in candidates:
             # Intrinsic imbalance score (lower imbalance preferred)
@@ -76,7 +77,6 @@ class GreedyCapSetGenerator:
             score = -bw * imbalance
             if noise:
                 score += noise * rng.random()
-
             priorities[vec] = score
 
         return priorities
@@ -128,7 +128,7 @@ class GreedyCapSetGenerator:
                 "existing_penalty": trial.suggest_float("existing_penalty", 0.0, 1.0),
                 "random_noise": trial.suggest_float("random_noise", 0.0, 0.05),
             }
-            cap = self.generate(params=sampled, rng=random.Random(_RANDOM_SEED))
+            cap = self.generate(params=sampled, rng=random.Random(_RANDOM_SEED + (trial.number or 0)))
             return float(len(cap))
 
         study = optuna.create_study(
@@ -139,13 +139,14 @@ class GreedyCapSetGenerator:
 
         best_params = dict(self.params)
         best_params.update(study.best_params)
-        best_capset = self.generate(params=best_params, rng=random.Random(_RANDOM_SEED))
+        best_trial_number = study.best_trial.number
+        best_capset = self.generate(params=best_params, rng=random.Random(_RANDOM_SEED + best_trial_number))
         return best_params, best_capset
 
 
 def generate_set(n: int) -> List[Tuple[int, ...]]:
     """Entry point called by the evaluator: run tuning then return best cap set."""
     generator = GreedyCapSetGenerator(n=n)
-    best_params, tuned_capset = generator.tune_with_optuna(max_trials=200, timeout=180.0)
+    best_params, tuned_capset = generator.tune_with_optuna(max_trials=300, timeout=180.0)
     return tuned_capset
 

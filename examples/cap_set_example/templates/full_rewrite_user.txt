@@ -175,13 +175,13 @@ Within `generate_set`:
 
 Recommended tuning parameters for this example:
 
-- **max_trials**: 200
+- **max_trials**: 300
 - **timeout**: 180 (seconds)
 
 Example call pattern inside `generate_set`:
 
 ```python
-best_params, tuned_capset = generator.tune_with_optuna(max_trials=200, timeout=180.0)
+best_params, tuned_capset = generator.tune_with_optuna(max_trials=300, timeout=180.0)
 ```
 
 ---
