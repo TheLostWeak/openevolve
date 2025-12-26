@@ -1,5 +1,0 @@
-Response field: responses
-
--- Items --
-[0]
-ChatCompletion(id=None, choices=None, created=None, model=None, object=None, service_tier=None, system_fingerprint=None, usage=None, error={'message': 'Internal Server Error', 'code': 500}, user_id='user_36vcyi3ncDQqaI0MsNYC9pYSZjv')
