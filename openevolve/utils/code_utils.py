@@ -3,6 +3,9 @@ Utilities for code parsing, diffing, and manipulation
 """
 
 import re
+import unicodedata
+import ast
+import difflib
 from typing import Dict, List, Optional, Tuple, Union
 
 
@@ -53,26 +56,117 @@ def apply_diff(
     Returns:
         Modified code
     """
-    # Split into lines for easier processing
-    original_lines = original_code.split("\n")
-    result_lines = original_lines.copy()
+    # Helper normalizer: unicode NFC, unify newlines, strip trailing whitespace
+    def _normalize_text(s: str) -> str:
+        s = unicodedata.normalize("NFC", s)
+        s = s.replace("\r\n", "\n").replace("\r", "\n")
+        # strip trailing whitespace on each line
+        s = "\n".join([ln.rstrip() for ln in s.split("\n")])
+        return s
+
+    def _collapse_whitespace(s: str) -> str:
+        return re.sub(r"\s+", " ", s).strip()
 
     # Extract diff blocks
     diff_blocks = extract_diffs(diff_text, diff_pattern)
 
-    # Apply each diff block
+    # Work on a single string for easier AST-based replacement
+    result_text = _normalize_text(original_code)
+
     for search_text, replace_text in diff_blocks:
-        search_lines = search_text.split("\n")
-        replace_lines = replace_text.split("\n")
+        search_text_n = _normalize_text(search_text)
+        replace_text_n = _normalize_text(replace_text)
 
-        # Find where the search pattern starts in the original code
-        for i in range(len(result_lines) - len(search_lines) + 1):
-            if result_lines[i : i + len(search_lines)] == search_lines:
-                # Replace the matched section
-                result_lines[i : i + len(search_lines)] = replace_lines
-                break
+        # 1) Try exact normalized match
+        if search_text_n in result_text:
+            result_text = result_text.replace(search_text_n, replace_text_n, 1)
+            continue
 
-    return "\n".join(result_lines)
+        # 2) Try whitespace-collapsed exact match
+        collapsed_result = _collapse_whitespace(result_text)
+        collapsed_search = _collapse_whitespace(search_text_n)
+        if collapsed_search in collapsed_result:
+            # Find the best span in original result_text that corresponds to collapsed match
+            # Use difflib to map
+            seqmatcher = difflib.SequenceMatcher(a=collapsed_result, b=collapsed_search)
+            match = seqmatcher.find_longest_match(0, len(collapsed_result), 0, len(collapsed_search))
+            if match.size > 0:
+                # Map collapsed_result span back to approximate location in result_text by searching substring
+                sub = collapsed_result[match.a : match.a + match.size]
+                idx = result_text.find(sub)
+                if idx != -1:
+                    result_text = result_text[:idx] + replace_text_n + result_text[idx + len(sub) :]
+                    continue
+
+        # 3) Try AST-aware replacement for Python named defs/classes
+        ast_replaced = False
+        try:
+            # If search_text looks like a def/class header, extract the name
+            m = re.match(r"^\s*(def|class)\s+([A-Za-z_][A-Za-z0-9_]*)", search_text_n)
+            if m:
+                kind, name = m.group(1), m.group(2)
+                # Parse result_text AST and locate node
+                module = ast.parse(result_text)
+                for node in module.body:
+                    if (isinstance(node, ast.FunctionDef) and kind == "def" and node.name == name) or (
+                        isinstance(node, ast.ClassDef) and kind == "class" and node.name == name
+                    ):
+                        # Python 3.8+ exposes end_lineno
+                        start = node.lineno - 1
+                        end = getattr(node, "end_lineno", None)
+                        if end is None:
+                            # Fallback: approximate by searching next top-level node lineno
+                            # Build list of top-level linenos
+                            top_linenos = [n.lineno for n in module.body if hasattr(n, "lineno")]
+                            top_linenos_sorted = sorted([ln for ln in top_linenos if ln > node.lineno])
+                            end = (top_linenos_sorted[0] - 1) if top_linenos_sorted else len(result_text.split("\n"))
+                        else:
+                            end = end
+
+                        orig_lines = result_text.split("\n")
+                        # Replace lines start:end with replace_text_n lines
+                        replace_lines = replace_text_n.split("\n")
+                        result_lines = orig_lines[:start] + replace_lines + orig_lines[end:]
+                        result_text = "\n".join(result_lines)
+                        ast_replaced = True
+                        break
+        except Exception:
+            ast_replaced = False
+
+        if ast_replaced:
+            continue
+
+        # 4) Fuzzy character-level match using edit distance over windows of lines
+        orig_lines = result_text.split("\n")
+        search_lines = search_text_n.split("\n")
+        best_match = None  # (score, start_idx, window_len)
+
+        # consider window lengths between len(search_lines)-2 and +2
+        min_len = max(1, len(search_lines) - 2)
+        max_len = len(search_lines) + 2
+
+        for wlen in range(min_len, max_len + 1):
+            for i in range(0, len(orig_lines) - wlen + 1):
+                window = "\n".join(orig_lines[i : i + wlen])
+                dist = calculate_edit_distance(window, search_text_n)
+                norm = dist / max(1, max(len(window), len(search_text_n)))
+                if best_match is None or norm < best_match[0]:
+                    best_match = (norm, i, wlen)
+
+        if best_match and best_match[0] <= 0.20:
+            # Accept replacement if normalized edit distance <= 0.20
+            _, i, wlen = best_match
+            orig_lines = result_text.split("\n")
+            replace_lines = replace_text_n.split("\n")
+            # Annotate fuzzy application with a comment for audit
+            replace_block = ["# >>> Applied fuzzy SEARCH/REPLACE (score={:.3f})".format(best_match[0])] + replace_lines + ["# <<< End fuzzy applied block"]
+            orig_lines[i : i + wlen] = replace_block
+            result_text = "\n".join(orig_lines)
+            continue
+
+        # If we reach here, no replacement applied — leave unchanged and continue
+
+    return result_text
 
 
 def extract_diffs(

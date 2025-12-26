@@ -24,7 +24,7 @@ evaluator:
 prompt:
   template_dir: "examples/cap_set_example/templates"
 
-diff_based_evolution: true
+diff_based_evolution: false
 
 max_iterations: 200
 checkpoint_interval: 50

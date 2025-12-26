@@ -52,11 +52,12 @@ class GreedyCapSetGenerator:
         rng: random.Random,
     ) -> Dict[Tuple[int, ...], float]:
         """
-        每轮只调用一次：把 candidates 中所有点的 priority 一次性算完并返回。
-        逻辑保持示范级简单：
-        - imbalance（点自身）
-        - existing_penalty * len(capset)（与已选集合的最弱耦合）
-        - 微噪声用于打平（可选）
+        Compute priorities for all candidates once per round and return them.
+
+        Simple, example-level scoring that combines:
+        - imbalance (intrinsic to the vector)
+        - existing_penalty * len(capset) (weak coupling to already-selected set)
+        - small random noise for tie-breaking (optional)
         """
         priorities: Dict[Tuple[int, ...], float] = {}
 
@@ -95,9 +96,10 @@ class GreedyCapSetGenerator:
         capset: List[Tuple[int, ...]] = []
         capset_set: Set[Tuple[int, ...]] = set()
 
-        # 动态贪心：每次选点后，重新计算所有候选点的 priority（但每轮只调用一次计算函数）
+        # Dynamic greedy: after adding a point, recompute priorities for all
+        # candidates. The priority computation function is called once per round.
         while True:
-            # 先收集本轮“可加入”的候选点
+            # First collect this round's candidates that can be added
             candidates: List[Tuple[int, ...]] = []
             for vec in all_vectors:
                 if vec in capset_set:
@@ -108,10 +110,10 @@ class GreedyCapSetGenerator:
             if not candidates:
                 break
 
-            # 每轮只调用一次：批量计算 priority
+            # Compute priorities in batch (called once per round)
             priorities = self._compute_priorities(candidates, capset, active_params, rng)
 
-            # 再遍历取最大
+            # Then scan to pick the highest-scoring candidate
             best_vec = None
             best_score = float("-inf")
             for vec in candidates:
