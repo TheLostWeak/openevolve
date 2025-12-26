@@ -1,0 +1,11 @@
+{
+  "combined_score": 0.0,
+  "error": "generator failure",
+  "error_detail": "Optuna is not installed. Please run: pip install optuna",
+  "eval_time_seconds": 0.08791279792785645,
+  "dimension": 8,
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_gen_runner_gcnwiz_q.py\", line 18, in <module>\n    res = mod.generate_set(arg)\n  File \"C:\\Users\\admin\\AppData\\Local\\Temp\\tmpuh9yf4pn.py\", line 163, in generate_set\n    best_params, tuned_capset = generator.tune_with_optuna(max_trials=100, timeout=30.0)\n  File \"C:\\Users\\admin\\AppData\\Local\\Temp\\tmpuh9yf4pn.py\", line 138, in tune_with_optuna\n    raise RuntimeError(\"Optuna is not installed. Please run: pip install optuna\")\nRuntimeError: Optuna is not installed. Please run: pip install optuna\n",
+  "artifact_path": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T020451Z_307e6521_tmpuh9yf4pn.py",
+  "generator_stdout_artifact": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T020452Z_d9c70760_generator_stdout.json",
+  "generator_stderr_artifact": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T020452Z_d9c70760_generator_stderr.txt"
+}

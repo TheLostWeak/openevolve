@@ -1,0 +1,10 @@
+{
+  "combined_score": 265.0,
+  "size": 265,
+  "valid": true,
+  "eval_time_seconds": 84.31873607635498,
+  "dimension": 8,
+  "artifact_path": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T021852Z_5efafb7d_tmp180oy58w.py",
+  "generator_stdout_artifact": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T022016Z_53d80c31_generator_stdout.json",
+  "generator_stderr_artifact": "C:\\Users\\admin\\AppData\\Local\\Temp\\openevolve_output\\artifacts\\20251226T022016Z_53d80c31_generator_stderr.txt"
+}

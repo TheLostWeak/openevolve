@@ -2,7 +2,7 @@ import itertools
 import random
 from typing import Tuple, List, Optional, Dict, Any, Set
 
-CAP_N = 6
+CAP_N = 8
 _RANDOM_SEED = 42
 
 
