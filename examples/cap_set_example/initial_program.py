@@ -98,14 +98,10 @@ class GreedyCapSetGenerator:
         capset: List[Tuple[int, ...]] = []
         capset_set: Set[Tuple[int, ...]] = set()
 
-        # Compute priorities once at the start without depending on the
-        # currently selected cap set. Then greedily iterate the sorted list
-        # and add any vector that preserves the cap-set property.
         candidates: List[Tuple[int, ...]] = [v for v in all_vectors]
         priorities = self._compute_priorities(candidates, active_params, rng)
         sorted_candidates = sorted(candidates, key=lambda v: priorities.get(v, float("-inf")), reverse=True)
 
-        # Greedily accept vectors in sorted order if they keep the cap property
         for vec in sorted_candidates:
             if can_add(vec, capset, capset_set):
                 capset.append(vec)

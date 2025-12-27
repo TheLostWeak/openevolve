@@ -1,76 +1,47 @@
+# TASK SPECIFICATION
 
-# TASK SPECIFICATION (SIMPLIFIED, FINAL VERSION)
+Produce a **complete, runnable Python module** that constructs a large **cap set** in 𝔽₃ⁿ.
 
-You must produce a **complete, runnable Python module** that constructs a large **cap set** in  
-𝔽₃ⁿ using **one fixed algorithmic structure**.
-
----
-
-## 1. Problem Definition
-
-A **cap set** is a subset A ⊆ 𝔽₃ⁿ such that there exist **no three distinct elements**
-x, y, z ∈ A satisfying:
-
-    x + y + z ≡ 0 (mod 3)
-
-The goal is to **maximize |A|**, while guaranteeing correctness.
+Important: reproducibility is required. The module must use a module-level `_RANDOM_SEED` and seed all internal randomness from it.
 
 ---
 
-## 2. Evaluation Constraints
+## 1. Goal
 
-- The evaluator will call **`generate_set(8)` exactly once**.
-- Runtime must be bounded and predictable.
-- Output must always be a valid cap set.
+Maximize |A| for a cap set A ⊆ 𝔽₃ⁿ (no nontrivial x+y+z ≡ 0), returning a list of n-length tuples.
 
 ---
 
-## 3. Mandatory Algorithmic Structure (Strict)
+## 2. Core Constraint
 
-You must use **one single, fixed greedy algorithm** with the following structure:
+The construction must be a **single greedy process**, where the global ordering of candidates is computed once (priorities are intrinsic-only) and then iterated deterministically.
 
-1. Start from the empty set.
-2. **Before construction**, compute a priority score for *every* candidate point.
-   - The score must depend **only on intrinsic properties** of the point.
-3. Sort all candidates **once** by this score (descending).
-4. Iterate through the sorted list:
-   - Add a point if doing so preserves the cap-set property.
-   - Otherwise skip it.
-5. Return the final set.
+---
 
-### Absolute Invariant
+## 3. Creativity
 
-> The global ordering of candidates is computed **once** and never changed.
-> No dynamic reordering or adaptive behavior is allowed.
+Feel free to be **bold** and **creative** when designing the **priority function**. Do not hesitate to explore aggressive heuristics or randomized components.
 
-Feel free to be bold and creative when designing the priority scoring function.
-As long as it depends only on intrinsic properties of each point, unconventional or nonlinear features are encouraged.
-Do not hesitate to explore aggressive heuristics or randomized components.
+You should try to go beyond the current implementation rather than being constrained by the references. That is to say, you can adopt completely different methods that may lead to breakthroughs.
+
 Performance gains take precedence over interpretability in the scoring design.
 
 ---
 
+## 4. Optuna / Param Tuning
 
+You should use **Optuna** to tune numeric hyperparameters for the priority function.
 
-## 4. Mandatory Use of Optuna
+For certain key hyperparameters that are difficult to accurately give specific values, Optuna can be used to make more thorough attempts.
 
-Inside `generate_set`, you **must**:
+Determinism (REASSERTED):
 
-1. Run an Optuna study using `TPESampler`.
-2. Optimize parameters that affect only the scoring function.
-3. Use the best parameters to perform **one final construction**.
-4. Return the resulting cap set.
-
-Constraints:
-- All trials must run the same algorithm.
-- No structural changes per trial.
-- Recommended:
-  - `max_trials ≈ 300`
-  - `timeout ≥ 180 seconds`
+- Define a module-level `_RANDOM_SEED` and use it to seed the Python `random` module, NumPy (if used), and Optuna `TPESampler` (if used).
+- Identical source + identical `_RANDOM_SEED` must produce identical output.
 
 ---
 
-## 5. Required API
+## 5. Output Format
 
 Your module must define:
 
@@ -88,42 +59,18 @@ class CapSetBuilder:
         ...
 ```
 
----
-
-## 6. Determinism
-
-* Define a module-level `_RANDOM_SEED`
-* Seed all randomness from it
-* Identical parameters must always produce identical output
-
----
-
-## 7. Minimal Documentation
-
-At the top of the file, briefly describe:
-
-* The fixed greedy algorithm
-* The meaning of each tunable parameter
-
-No extra commentary or references.
-
----
-
-## 8. Output Format
-
-Return **only** a complete Python module:
+Return only the full Python module source as your reply.
 
 ```python
 <full module code>
 ```
 
-## ─────────────────────────────────────────────
+---
 
-## CURRENT PROGRAM CONTEXT (FILLED BY SYSTEM)
-
-## ─────────────────────────────────────────────
+## 6. CURRENT PROGRAM CONTEXT
 
 Parent program code (base to improve):
+
 ```python
 {current_program}
 ```
@@ -142,5 +89,5 @@ Top/diverse attempts from this island:
 Inspirations (same island):
 {inspirations}
 
-Artifacts (if available):
+Artifacts:
 {artifacts}

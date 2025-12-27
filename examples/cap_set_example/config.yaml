@@ -23,6 +23,8 @@ evaluator:
 
 prompt:
   template_dir: "examples/cap_set_example/templates"
+  num_top_programs: 2
+  num_diverse_programs: 1
 
 diff_based_evolution: false
 
