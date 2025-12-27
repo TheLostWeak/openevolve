@@ -10,6 +10,8 @@ Important: reproducibility is required. The module must use a module-level `_RAN
 
 Maximize |A| for a cap set A ⊆ 𝔽₃ⁿ (no nontrivial x+y+z ≡ 0), returning a list of n-length tuples.
 
+In this task, the evaluator will call **`generate_set(8)` exactly once** (i.e. n = 8).
+
 ---
 
 ## 2. Core Constraint
@@ -22,7 +24,7 @@ The construction must be a **single greedy process**, where the global ordering 
 
 Feel free to be **bold** and **creative** when designing the **priority function**. Do not hesitate to explore aggressive heuristics or randomized components.
 
-You should try to go beyond the current implementation rather than being constrained by the references. That is to say, you can adopt completely different methods that may lead to breakthroughs.
+You are encouraged to go beyond the current implementation rather than being constrained by the references. That is to say, you can adopt completely different methods that may lead to breakthroughs.
 
 Performance gains take precedence over interpretability in the scoring design.
 
