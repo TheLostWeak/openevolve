@@ -1,16 +1,15 @@
 llm:
   api_base: "https://openrouter.ai/api/v1"
   models:
-    - name: "google/gemini-3-flash-preview"
     # - name: "openai/gpt-5.2"
     # - name: "openai/gpt-5.1-codex-max"
     # - name: "deepseek/deepseek-v3.2-speciale"
     # - name: "meta-llama/llama-3.1-405b-instruct:free"
-    # - name: "qwen/qwen3-coder:free"
+    - name: "qwen/qwen3-coder:free"
       weight: 1.0
 
 database:
-  db_path: "examples/cap_set_example/openevolve_output/db"
+  db_path: "examples/admissible_set_example/openevolve_output/db"
   log_prompts: true
   feature_dimensions:
     - "combined_score"
@@ -23,7 +22,7 @@ evaluator:
   cascade_evaluation: false
 
 prompt:
-  template_dir: "examples/cap_set_example/templates"
+  template_dir: "examples/admissible_set_example/templates"
   num_top_programs: 2
   num_diverse_programs: 1
 
@@ -37,10 +36,10 @@ evolution_trace:
   include_prompts: true
   include_code: false
   format: jsonl
-  output_path: "examples/cap_set_example/openevolve_trace.jsonl"
+  output_path: "examples/admissible_set_example/openevolve_trace.jsonl"
   buffer_size: 10
 
 max_code_length: 60000
 
 evaluator:
-  timeout: 900  # 秒
+  timeout: 900

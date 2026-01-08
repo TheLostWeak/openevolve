@@ -2,7 +2,7 @@ import itertools
 import random
 from typing import Tuple, List, Optional, Dict, Any, Set
 
-CAP_N = 8
+CAP_N = 7
 _RANDOM_SEED = 42
 
 
@@ -30,56 +30,28 @@ class GreedyCapSetGenerator:
         self.n = n
         self.params: Dict[str, Any] = {
             "balance_weight": 0.6,
-            "existing_penalty": 0.1,
-            "random_noise": 0.02,
         }
         if params:
             self.params.update(params)
 
-    @staticmethod
-    def _try_import_optuna():
-        try:
-            import optuna  # type: ignore
-        except ImportError:
-            return None
-        return optuna
-
-    def _compute_priorities(
+    def _compute_priority(
         self,
-        candidates: List[Tuple[int, ...]],
+        vec: Tuple[int, ...],
         params: Dict[str, Any],
         rng: random.Random,
-    ) -> Dict[Tuple[int, ...], float]:
+    ) -> float:
         """
-        Compute intrinsic priorities for candidates.
-
-        This priority function intentionally does NOT depend on the current
-        `capset`. It scores each candidate using only features intrinsic to
-        the vector (e.g. coordinate imbalance) and optional random noise.
-
-        The generator will compute these priorities once at the start,
-        sort candidates by priority, then greedily attempt to add each
-        candidate in order if it does not violate the cap set constraint.
+        Compute intrinsic priority for the vector.
         """
-        priorities: Dict[Tuple[int, ...], float] = {}
-
-        noise = params.get("random_noise", 0.0)
         bw = params.get("balance_weight", 0.6)
-        ep = params.get("existing_penalty", 0.0)
 
-        for vec in candidates:
-            # Intrinsic imbalance score (lower imbalance preferred)
-            c0 = vec.count(0)
-            c1 = vec.count(1)
-            c2 = vec.count(2)
-            imbalance = abs(c0 - c1) + abs(c1 - c2) + abs(c0 - c2)
+        c0 = vec.count(0)
+        c1 = vec.count(1)
+        c2 = vec.count(2)
+        imbalance = abs(c0 - c1) + abs(c1 - c2) + abs(c0 - c2)
 
-            score = -bw * imbalance
-            if noise:
-                score += noise * rng.random()
-            priorities[vec] = score
-
-        return priorities
+        score = -bw * imbalance
+        return score
 
     def generate(
         self,
@@ -99,7 +71,9 @@ class GreedyCapSetGenerator:
         capset_set: Set[Tuple[int, ...]] = set()
 
         candidates: List[Tuple[int, ...]] = [v for v in all_vectors]
-        priorities = self._compute_priorities(candidates, active_params, rng)
+        priorities: Dict[Tuple[int, ...], float] = {
+            v: self._compute_priority(v, active_params, rng) for v in candidates
+        }
         sorted_candidates = sorted(candidates, key=lambda v: priorities.get(v, float("-inf")), reverse=True)
 
         for vec in sorted_candidates:
@@ -111,20 +85,16 @@ class GreedyCapSetGenerator:
 
     def tune_with_optuna(
         self,
-        max_trials: int = 200,
+        max_trials: int = 1000,
         timeout: float = 180.0,
     ) -> Tuple[Dict[str, Any], List[Tuple[int, ...]]]:
-        optuna = self._try_import_optuna()
-        if optuna is None:
-            raise RuntimeError("Optuna is not installed. Please run: pip install optuna")
-
+        import optuna
+        
         def objective(trial: Any) -> float:
             sampled = {
                 "balance_weight": trial.suggest_float("balance_weight", 0.0, 2.0),
-                "existing_penalty": trial.suggest_float("existing_penalty", 0.0, 1.0),
-                "random_noise": trial.suggest_float("random_noise", 0.0, 0.05),
             }
-            cap = self.generate(params=sampled, rng=random.Random(_RANDOM_SEED + (trial.number or 0)))
+            cap = self.generate(params=sampled, rng=random.Random(_RANDOM_SEED))
             return float(len(cap))
 
         study = optuna.create_study(
@@ -135,8 +105,7 @@ class GreedyCapSetGenerator:
 
         best_params = dict(self.params)
         best_params.update(study.best_params)
-        best_trial_number = study.best_trial.number
-        best_capset = self.generate(params=best_params, rng=random.Random(_RANDOM_SEED + best_trial_number))
+        best_capset = self.generate(params=best_params, rng=random.Random(_RANDOM_SEED))
         return best_params, best_capset
 
 
@@ -145,4 +114,3 @@ def generate_set(n: int) -> List[Tuple[int, ...]]:
     generator = GreedyCapSetGenerator(n=n)
     best_params, tuned_capset = generator.tune_with_optuna(max_trials=300, timeout=180.0)
     return tuned_capset
-

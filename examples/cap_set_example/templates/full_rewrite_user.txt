@@ -10,7 +10,7 @@ Important: reproducibility is required. The module must use a module-level `_RAN
 
 Maximize |A| for a cap set A ⊆ 𝔽₃ⁿ (no nontrivial x+y+z ≡ 0), returning a list of n-length tuples.
 
-In this task, the evaluator will call **`generate_set(8)` exactly once** (i.e. n = 8).
+In this task, the evaluator will call **`generate_set(7)` exactly once** (i.e. n = 7).
 
 ---
 
@@ -18,13 +18,17 @@ In this task, the evaluator will call **`generate_set(8)` exactly once** (i.e. n
 
 The construction must be a **single greedy process**, where the global ordering of candidates is computed once (priorities are intrinsic-only) and then iterated deterministically.
 
+Hint: You can exploit **symmetry** to construct relationships between coordinates to obtain better feature representations.
+
+For example, you can **group coordinates** to reduce the solution space (i.e. consider the relationships among vec[i], vec[-i], vec[i - k], vec[i + k], and vec[(i + k) % n]).
+
 ---
 
 ## 3. Creativity
 
 Feel free to be **bold** and **creative** when designing the **priority function**. Do not hesitate to explore aggressive heuristics or randomized components.
 
-You are encouraged to go beyond the current implementation rather than being constrained by the references. That is to say, you can adopt completely different methods that may lead to breakthroughs.
+You are encouraged to **outperform** the current implementation rather than being constrained by the references. That is to say, you can adopt **completely different** methods that may lead to breakthroughs.
 
 Performance gains take precedence over interpretability in the scoring design.
 
@@ -35,6 +39,8 @@ Performance gains take precedence over interpretability in the scoring design.
 You should use **Optuna** to tune numeric hyperparameters for the priority function.
 
 For certain key hyperparameters that are difficult to accurately give specific values, Optuna can be used to make more thorough attempts.
+
+You must control the number of parameters (not exceeding 7), as too many parameters may result in ineffective parameter tuning within the limited time.
 
 Determinism (REASSERTED):
 
@@ -82,14 +88,8 @@ Metrics / fitness:
 - fitness_score: {fitness_score}
 - feature_coords: {feature_coords}
 
-Recent evolution highlights:
-{improvement_areas}
-
 Top/diverse attempts from this island:
 {evolution_history}
-
-Inspirations (same island):
-{inspirations}
 
 Artifacts:
 {artifacts}
