@@ -85,7 +85,7 @@ class GreedyCapSetGenerator:
 
     def tune_with_optuna(
         self,
-        max_trials: int = 1000,
+        max_trials: int = 3000,
         timeout: float = 180.0,
     ) -> Tuple[Dict[str, Any], List[Tuple[int, ...]]]:
         import optuna

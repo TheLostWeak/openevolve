@@ -36,11 +36,13 @@ Performance gains take precedence over interpretability in the scoring design.
 
 ## 4. Optuna / Param Tuning
 
-You should use **Optuna** to tune numeric hyperparameters for the priority function.
+You could use **Optuna** to tune numeric hyperparameters for the priority function.
 
 For certain key hyperparameters that are difficult to accurately give specific values, Optuna can be used to make more thorough attempts.
 
-You must control the number of parameters (not exceeding 7), as too many parameters may result in ineffective parameter tuning within the limited time.
+You should control the number of parameters, as too many parameters may result in ineffective parameter tuning within the limited time.
+
+You should optimize for sufficiently many trials (e.g., at least 3000 trials) to ensure effective parameter tuning.
 
 Determinism (REASSERTED):
 
