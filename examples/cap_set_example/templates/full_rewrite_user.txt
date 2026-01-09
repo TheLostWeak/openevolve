@@ -10,7 +10,7 @@ Important: reproducibility is required. The module must use a module-level `_RAN
 
 Maximize |A| for a cap set A ⊆ 𝔽₃ⁿ (no nontrivial x+y+z ≡ 0), returning a list of n-length tuples.
 
-In this task, the evaluator will call **`generate_set(7)` exactly once** (i.e. n = 7).
+In this task, the evaluator will call **`generate_set(8)` exactly once** (i.e. n = 8).
 
 The current state-of-the-art result is 512, and our goal is to surpass it.
 
@@ -44,7 +44,7 @@ For certain key hyperparameters that are difficult to accurately give specific v
 
 You should control the number of parameters, as too many parameters may result in ineffective parameter tuning within the limited time.
 
-You should optimize for sufficiently many trials (e.g., at least 3000 trials) to ensure effective parameter tuning.
+You should optimize for sufficiently many trials (e.g., at least 300 trials) to ensure effective parameter tuning.
 
 Determinism (REASSERTED):
 

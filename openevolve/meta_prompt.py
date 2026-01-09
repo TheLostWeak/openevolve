@@ -8,7 +8,7 @@ import random
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from openevolve.config import PromptConfig
 from openevolve.utils.format_utils import format_metrics_safe
@@ -21,7 +21,8 @@ META_PROMPT_SYSTEM = (
     "You are an expert prompt engineer for code evolution. "
     "Write multiple concise bullet points that will be inserted into a user prompt. "
     "Each bullet should be an actionable instruction that helps improve code quality "
-    "and evaluation score. Use '-' bullets. "
+    "and evaluation score. Make the bullets specific to the task and primary metric. "
+    "Use '-' bullets. "
     "Return ONLY the bullet list, without quotes or extra prefixes."
 )
 
@@ -130,14 +131,18 @@ class MetaPromptDatabase:
         parent_metrics = getattr(parent_program, "metrics", {}) or {}
         parent_fitness = get_fitness_score(parent_metrics, feature_dimensions)
         metrics_str = format_metrics_safe(parent_metrics)
+        focus, domain_hints = self._infer_focus(parent_program, parent_metrics)
 
         user_msg = (
             "Task system message:\n"
             f"{self.system_message}\n\n"
             f"Programming language: {self.language}\n"
+            f"Primary objective: maximize {focus}\n"
             f"Parent fitness: {parent_fitness:.4f}\n"
             f"Parent metrics: {metrics_str}\n"
         )
+        if domain_hints:
+            user_msg += f"\nDomain hints: {domain_hints}\n"
         if seed_prompt:
             user_msg += f"\nSeed instruction to refine:\n{seed_prompt}\n"
         user_msg += (
@@ -190,3 +195,23 @@ class MetaPromptDatabase:
         if system_message in template_manager.templates:
             return template_manager.get_template(system_message)
         return system_message
+
+    def _infer_focus(self, parent_program, parent_metrics: Dict[str, Any]) -> Tuple[str, str]:
+        """Infer the primary objective and optional domain hints."""
+        code = getattr(parent_program, "code", "") or ""
+        system_lower = (self.system_message or "").lower()
+        code_lower = code.lower()
+
+        if "cap set" in system_lower or "capset" in system_lower or "cap set" in code_lower:
+            return (
+                "cap set size (maximize size while preserving validity)",
+                "Consider symmetry breaking, pruning invalid triples early, and faster set membership checks.",
+            )
+
+        if "size" in parent_metrics:
+            return ("size metric", "")
+
+        if "combined_score" in parent_metrics:
+            return ("combined_score", "")
+
+        return ("overall evaluation score", "")

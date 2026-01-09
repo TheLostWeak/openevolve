@@ -2,7 +2,7 @@ import itertools
 import random
 from typing import Tuple, List, Optional, Dict, Any, Set
 
-CAP_N = 7
+CAP_N = 8
 _RANDOM_SEED = 42
 
 
@@ -85,7 +85,7 @@ class GreedyCapSetGenerator:
 
     def tune_with_optuna(
         self,
-        max_trials: int = 3000,
+        max_trials: int = 300,
         timeout: float = 180.0,
     ) -> Tuple[Dict[str, Any], List[Tuple[int, ...]]]:
         import optuna
