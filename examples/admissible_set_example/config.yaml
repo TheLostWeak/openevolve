@@ -1,0 +1,45 @@
+llm:
+  api_base: "https://openrouter.ai/api/v1"
+  models:
+    # - name: "openai/gpt-5.2"
+    # - name: "openai/gpt-5.1-codex-max"
+    # - name: "deepseek/deepseek-v3.2-speciale"
+    # - name: "meta-llama/llama-3.1-405b-instruct:free"
+    - name: "qwen/qwen3-coder:free"
+      weight: 1.0
+
+database:
+  db_path: "examples/admissible_set_example/openevolve_output/db"
+  log_prompts: true
+  feature_dimensions:
+    - "combined_score"
+  population_size: 200
+  num_islands: 3
+
+evaluator:
+  timeout: 600
+  max_retries: 1
+  cascade_evaluation: false
+
+prompt:
+  template_dir: "examples/admissible_set_example/templates"
+  num_top_programs: 2
+  num_diverse_programs: 1
+
+diff_based_evolution: false
+
+max_iterations: 200
+checkpoint_interval: 50
+
+evolution_trace:
+  enabled: true
+  include_prompts: true
+  include_code: false
+  format: jsonl
+  output_path: "examples/admissible_set_example/openevolve_trace.jsonl"
+  buffer_size: 10
+
+max_code_length: 60000
+
+evaluator:
+  timeout: 900
