@@ -278,9 +278,12 @@ class PromptConfig:
     template_variations: Dict[str, List[str]] = field(default_factory=dict)
 
     # Meta-prompting
-    # Note: meta-prompting features not implemented
     use_meta_prompting: bool = False
     meta_prompt_weight: float = 0.1
+    meta_prompt_population_size: int = 50
+    meta_prompt_archive_size: int = 10
+    meta_prompt_mutation_rate: float = 0.3
+    meta_prompt_max_chars: int = 800
 
     # Artifact rendering
     include_artifacts: bool = True
@@ -443,8 +446,13 @@ class Config:
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "Config":
         """Load configuration from a YAML file"""
-        with open(path, "r") as f:
-            config_dict = yaml.safe_load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                config_dict = yaml.safe_load(f)
+        except UnicodeDecodeError:
+            # Fallback for non-UTF8 files on Windows locales.
+            with open(path, "r", encoding="gbk", errors="replace") as f:
+                config_dict = yaml.safe_load(f)
         return cls.from_dict(config_dict)
 
     @classmethod

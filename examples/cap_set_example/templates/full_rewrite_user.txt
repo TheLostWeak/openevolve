@@ -15,6 +15,8 @@ x, y, z ∈ A satisfying:
 
 The goal is to **maximize |A|**, while guaranteeing correctness.
 
+The current state-of-the-art result is 512, and our goal is to surpass it.
+
 ---
 
 ## 2. Evaluation Constraints

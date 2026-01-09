@@ -16,6 +16,7 @@ from openevolve.database import Program, ProgramDatabase
 from openevolve.evaluator import Evaluator
 from openevolve.evolution_trace import EvolutionTracer
 from openevolve.llm.ensemble import LLMEnsemble
+from openevolve.meta_prompt import MetaPromptDatabase
 from openevolve.process_parallel import ProcessParallelController
 from openevolve.prompt.sampler import PromptSampler
 from openevolve.utils.code_utils import extract_code_language
@@ -139,6 +140,15 @@ class OpenEvolve:
         self.prompt_sampler = PromptSampler(self.config.prompt)
         self.evaluator_prompt_sampler = PromptSampler(self.config.prompt)
         self.evaluator_prompt_sampler.set_templates("evaluator_system_message")
+
+        self.meta_prompt_db = None
+        if self.config.prompt.use_meta_prompting:
+            self.meta_prompt_db = MetaPromptDatabase(
+                config=self.config.prompt,
+                llm_ensemble=self.llm_ensemble,
+                language=self.config.language,
+                system_message=self.config.prompt.system_message,
+            )
 
         # Pass random seed to database if specified
         if self.config.random_seed is not None:
@@ -299,6 +309,7 @@ class OpenEvolve:
                 self.database,
                 self.evolution_tracer,
                 file_suffix=self.config.file_suffix,
+                meta_prompt_db=self.meta_prompt_db,
             )
 
             # Set up signal handlers for graceful shutdown

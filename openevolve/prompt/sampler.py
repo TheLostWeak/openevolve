@@ -62,6 +62,7 @@ class PromptSampler:
         template_key: Optional[str] = None,
         program_artifacts: Optional[Dict[str, Union[str, bytes]]] = None,
         feature_dimensions: Optional[List[str]] = None,
+        meta_prompt: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, str]:
         """
@@ -79,6 +80,7 @@ class PromptSampler:
             diff_based_evolution: Whether to use diff-based evolution (True) or full rewrites (False)
             template_key: Optional override for template key
             program_artifacts: Optional artifacts from program evaluation
+            meta_prompt: Optional meta prompt to inject into the user message
             **kwargs: Additional keys to replace in the user prompt
 
         Returns:
@@ -149,9 +151,15 @@ class PromptSampler:
             **kwargs,
         )
 
+        if meta_prompt:
+            meta_prompt = meta_prompt.strip()
+            if meta_prompt:
+                user_message = f"Additional instructions:\n{meta_prompt}\n\n{user_message}"
+
         return {
             "system": system_message,
             "user": user_message,
+            "meta_prompt": meta_prompt or "",
         }
 
     def _format_metrics(self, metrics: Dict[str, float]) -> str:

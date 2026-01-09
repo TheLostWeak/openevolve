@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from openevolve.config import Config
 from openevolve.database import Program, ProgramDatabase
-from openevolve.utils.metrics_utils import safe_numeric_average
+from openevolve.meta_prompt import MetaPromptDatabase
+from openevolve.utils.metrics_utils import get_fitness_score, safe_numeric_average
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class SerializableResult:
     artifacts: Optional[Dict[str, Any]] = None
     iteration: int = 0
     error: Optional[str] = None
+    meta_prompt_id: Optional[str] = None
+    meta_prompt_text: Optional[str] = None
 
 
 def _worker_init(config_dict: dict, evaluation_file: str, parent_env: dict = None) -> None:
@@ -131,7 +134,12 @@ def _lazy_init_worker_components():
 
 
 def _run_iteration_worker(
-    iteration: int, db_snapshot: Dict[str, Any], parent_id: str, inspiration_ids: List[str]
+    iteration: int,
+    db_snapshot: Dict[str, Any],
+    parent_id: str,
+    inspiration_ids: List[str],
+    meta_prompt_text: Optional[str] = None,
+    meta_prompt_id: Optional[str] = None,
 ) -> SerializableResult:
     """Run a single iteration in a worker process"""
     try:
@@ -180,6 +188,7 @@ def _run_iteration_worker(
             diff_based_evolution=_worker_config.diff_based_evolution,
             program_artifacts=parent_artifacts,
             feature_dimensions=db_snapshot.get("feature_dimensions", []),
+            meta_prompt=meta_prompt_text,
         )
         logger.info(
             "Iteration %s prompt (system then user):\n%s\n\n%s",
@@ -287,6 +296,8 @@ def _run_iteration_worker(
             llm_response=llm_response,
             artifacts=artifacts,
             iteration=iteration,
+            meta_prompt_id=meta_prompt_id,
+            meta_prompt_text=meta_prompt_text,
         )
 
     except Exception as e:
@@ -304,12 +315,14 @@ class ProcessParallelController:
         database: ProgramDatabase,
         evolution_tracer=None,
         file_suffix: str = ".py",
+        meta_prompt_db: Optional[MetaPromptDatabase] = None,
     ):
         self.config = config
         self.evaluation_file = evaluation_file
         self.database = database
         self.evolution_tracer = evolution_tracer
         self.file_suffix = file_suffix
+        self.meta_prompt_db = meta_prompt_db
 
         self.executor: Optional[ProcessPoolExecutor] = None
         self.shutdown_event = mp.Event()
@@ -667,6 +680,34 @@ class ProcessParallelController:
                     #use this to increment island generation
                     self.database.increment_island_generation(island_idx=island_id)
 
+                    # Update meta-prompt score based on relative fitness improvement
+                    if (
+                        self.config.prompt.use_meta_prompting
+                        and self.meta_prompt_db
+                        and getattr(result, "meta_prompt_id", None)
+                    ):
+                        parent_program = (
+                            self.database.get(result.parent_id) if result.parent_id else None
+                        )
+                        if parent_program and child_program.metrics and parent_program.metrics:
+                            child_fitness = get_fitness_score(
+                                child_program.metrics,
+                                self.database.config.feature_dimensions,
+                            )
+                            parent_fitness = get_fitness_score(
+                                parent_program.metrics,
+                                self.database.config.feature_dimensions,
+                            )
+                            fitness_delta = child_fitness - parent_fitness
+                            self.meta_prompt_db.update_score(
+                                result.meta_prompt_id, fitness_delta
+                            )
+                            logger.debug(
+                                "Meta-prompt %s fitness delta: %+0.4f",
+                                result.meta_prompt_id,
+                                fitness_delta,
+                            )
+
                     # Check migration
                     if self.database.should_migrate():
                         logger.info(f"Performing migration at iteration {completed_iteration}")
@@ -882,6 +923,16 @@ class ProcessParallelController:
             db_snapshot = self._create_database_snapshot()
             db_snapshot["sampling_island"] = target_island  # Mark which island this is for
 
+            meta_prompt_text = None
+            meta_prompt_id = None
+            if self.config.prompt.use_meta_prompting and self.meta_prompt_db:
+                meta_prompt = self.meta_prompt_db.sample(
+                    parent_program=parent,
+                    feature_dimensions=self.database.config.feature_dimensions,
+                )
+                meta_prompt_text = meta_prompt.text
+                meta_prompt_id = meta_prompt.id
+
             # Submit to process pool
             future = self.executor.submit(
                 _run_iteration_worker,
@@ -889,6 +940,8 @@ class ProcessParallelController:
                 db_snapshot,
                 parent.id,
                 [insp.id for insp in inspirations],
+                meta_prompt_text,
+                meta_prompt_id,
             )
 
             return future

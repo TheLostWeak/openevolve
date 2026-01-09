@@ -4,6 +4,9 @@
 Usage:
   python export_all.py --output <openevolve_output_dir>
 
+python export_all.py --output ..\openevolve_output
+E:\课程资料\机器学习\大作业\openevolve\examples\cap_set_example\openevolve_output
+
 Creates per-iteration directories under <output>/iteration_exports/iter{n} containing:
   - prompt.txt        (System / User separated, unescaped newlines)
   - response.json     (if response is JSON)

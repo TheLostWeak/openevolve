@@ -1,6 +1,7 @@
 results/
 examples/lm_eval/prompts/system_message.txt
 examples/lm_eval/prompts/evaluator_system_message.txt
+examples/cap_set_example/openevolve_trace.jsonl
 
 # Python
 __pycache__/

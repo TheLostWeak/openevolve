@@ -1,11 +1,12 @@
-llm:
+﻿llm:
   api_base: "https://openrouter.ai/api/v1"
   models:
     # - name: "openai/gpt-5.2"
     # - name: "openai/gpt-5.1-codex-max"
     # - name: "deepseek/deepseek-v3.2-speciale"
     # - name: "meta-llama/llama-3.1-405b-instruct:free"
-    - name: "qwen/qwen3-coder:free"
+    - name: "google/gemini-3-flash-preview"
+    # - name: "qwen/qwen3-coder:free"
       weight: 1.0
 
 database:
@@ -15,14 +16,6 @@ database:
     - "combined_score"
   population_size: 200
   num_islands: 3
-
-evaluator:
-  timeout: 600
-  max_retries: 1
-  cascade_evaluation: false
-
-prompt:
-  template_dir: "examples/cap_set_example/templates"
 
 diff_based_evolution: false
 
@@ -40,4 +33,17 @@ evolution_trace:
 max_code_length: 60000
 
 evaluator:
-  timeout: 900  # 秒
+  timeout: 900
+  max_retries: 1
+  cascade_evaluation: false
+
+prompt:
+  template_dir: "examples/cap_set_example/templates"
+  num_top_programs: 3
+  num_diverse_programs: 2
+  use_meta_prompting: true
+  meta_prompt_weight: 0.1
+  meta_prompt_population_size: 50
+  meta_prompt_archive_size: 10
+  meta_prompt_mutation_rate: 0.3
+  meta_prompt_max_chars: 8000
