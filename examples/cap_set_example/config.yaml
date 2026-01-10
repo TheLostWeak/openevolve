@@ -26,8 +26,6 @@ diff_based_evolution: false
 max_iterations: 200
 checkpoint_interval: 50
 
-log_level: DEBUG
-
 evolution_trace:
   enabled: true
   include_prompts: true
