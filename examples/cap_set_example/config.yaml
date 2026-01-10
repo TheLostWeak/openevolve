@@ -8,6 +8,10 @@ llm:
     - name: "google/gemini-3-flash-preview"
     # - name: "qwen/qwen3-coder:free"
       weight: 1.0
+      # Enable provider reasoning mode and return reasoning_details for chaining
+      extra_body:
+        reasoning:
+          enabled: true
 
 database:
   db_path: "examples/cap_set_example/openevolve_output/db"
@@ -21,6 +25,8 @@ diff_based_evolution: false
 
 max_iterations: 200
 checkpoint_interval: 50
+
+log_level: DEBUG
 
 evolution_trace:
   enabled: true
@@ -45,5 +51,5 @@ prompt:
   meta_prompt_weight: 0.1
   meta_prompt_population_size: 50
   meta_prompt_archive_size: 10
-  meta_prompt_mutation_rate: 0.3
+  meta_prompt_mutation_rate: 1
   meta_prompt_max_chars: 8000

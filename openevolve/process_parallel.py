@@ -31,6 +31,7 @@ class SerializableResult:
     iteration_time: float = 0.0
     prompt: Optional[Dict[str, str]] = None
     llm_response: Optional[str] = None
+    reasoning_details: Optional[Dict[str, Any]] = None
     artifacts: Optional[Dict[str, Any]] = None
     iteration: int = 0
     error: Optional[str] = None
@@ -203,15 +204,24 @@ def _run_iteration_worker(
 
         # Generate code modification (sync wrapper for async)
         try:
-            llm_response = asyncio.run(
+            llm_raw = asyncio.run(
                 _worker_llm_ensemble.generate_with_context(
                     system_message=prompt["system"],
                     messages=[{"role": "user", "content": prompt["user"]}],
+                    return_message_dict=True,
                 )
             )
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
             return SerializableResult(error=f"LLM generation failed: {str(e)}", iteration=iteration)
+
+        # Normalize response
+        if isinstance(llm_raw, dict):
+            llm_response = llm_raw.get("content", "")
+            llm_reasoning = llm_raw.get("reasoning_details")
+        else:
+            llm_response = llm_raw
+            llm_reasoning = None
 
         # Check for None response
         if llm_response is None:
@@ -233,6 +243,7 @@ def _run_iteration_worker(
                     error=f"No valid diffs found in response",
                     prompt=prompt,
                     llm_response=llm_response,
+                    reasoning_details=llm_reasoning,
                     iteration=iteration,
                 )
 
@@ -250,6 +261,7 @@ def _run_iteration_worker(
                     error=f"No valid code found in response",
                     prompt=prompt,
                     llm_response=llm_response,
+                    reasoning_details=llm_reasoning,
                     iteration=iteration,
                 )
 
@@ -296,6 +308,7 @@ def _run_iteration_worker(
             iteration_time=iteration_time,
             prompt=prompt,
             llm_response=llm_response,
+            reasoning_details=llm_reasoning,
             artifacts=artifacts,
             iteration=iteration,
             meta_prompt_id=meta_prompt_id,

@@ -28,6 +28,7 @@ class Result:
     iteration_time: float = None
     prompt: str = None
     llm_response: str = None
+    reasoning_details: dict = None
     artifacts: dict = None
 
 
@@ -79,10 +80,19 @@ async def run_iteration_with_shared_db(
         iteration_start = time.time()
 
         # Generate code modification
-        llm_response = await llm_ensemble.generate_with_context(
+        llm_raw = await llm_ensemble.generate_with_context(
             system_message=prompt["system"],
             messages=[{"role": "user", "content": prompt["user"]}],
+            return_message_dict=True,
         )
+
+        if isinstance(llm_raw, dict):
+            llm_response = llm_raw.get("content", "")
+            llm_reasoning = llm_raw.get("reasoning_details")
+        else:
+            llm_response = llm_raw
+            llm_reasoning = None
+
         logger.info("Iteration %s RAW LLM RESPONSE:", iteration)
         logger.info("%s", llm_response)
 
@@ -154,6 +164,7 @@ async def run_iteration_with_shared_db(
 
         result.prompt = prompt
         result.llm_response = llm_response
+        result.reasoning_details = llm_reasoning
         result.artifacts = artifacts
         result.iteration_time = time.time() - iteration_start
         result.iteration = iteration

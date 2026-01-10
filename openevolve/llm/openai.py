@@ -35,6 +35,7 @@ class OpenAILLM(LLMInterface):
         self.api_key = model_cfg.api_key or None
         self.random_seed = getattr(model_cfg, "random_seed", None)
         self.reasoning_effort = getattr(model_cfg, "reasoning_effort", None)
+        self.extra_body = getattr(model_cfg, "extra_body", None)
 
         # Set up API client
         # OpenAI client requires max_retries to be int, not None
@@ -64,8 +65,11 @@ class OpenAILLM(LLMInterface):
 
     async def generate_with_context(
         self, system_message: str, messages: List[Dict[str, str]], **kwargs
-    ) -> str:
-        """Generate text using a system message and conversational context"""
+    ) -> Union[str, Dict[str, Any]]:
+        """Generate text using a system message and conversational context.
+
+        Set return_message_dict=True to get both content and reasoning_details back.
+        """
         # Prepare messages with system message
         formatted_messages = [{"role": "system", "content": system_message}]
         formatted_messages.extend(messages)
@@ -128,15 +132,21 @@ class OpenAILLM(LLMInterface):
                 params["reasoning_effort"] = reasoning_effort
 
         # Support provider-specific extra body parameters (e.g., OpenRouter's extra_body)
-        # Merge user-supplied extra_body into params so it is forwarded to the provider.
+        # Merge model-level extra_body with user-supplied extra_body so they both pass through.
+        # Model-level is the base; per-call user_extra can override or extend.
+        model_extra = getattr(self, "extra_body", None)
         user_extra = kwargs.get("extra_body")
+
+        # Start with model_extra if provided
+        if model_extra is not None:
+            params["extra_body"] = model_extra if not isinstance(model_extra, dict) else dict(model_extra)
+
+        # Merge/override with user_extra
         if user_extra is not None:
-            # Ensure we don't overwrite an existing extra_body
             params["extra_body"] = params.get("extra_body", {})
             if isinstance(user_extra, dict):
                 params["extra_body"].update(user_extra)
             else:
-                # If extra_body provided as non-dict, just set it directly
                 params["extra_body"] = user_extra
 
         # For reasoning models, ensure reasoning is enabled by default unless user overrides
@@ -167,7 +177,10 @@ class OpenAILLM(LLMInterface):
 
         for attempt in range(retries + 1):
             try:
-                response = await asyncio.wait_for(self._call_api(params), timeout=timeout)
+                response = await asyncio.wait_for(
+                    self._call_api(params, return_message_dict=kwargs.get("return_message_dict")),
+                    timeout=timeout,
+                )
                 return response
             except asyncio.TimeoutError:
                 if attempt < retries:
@@ -186,7 +199,7 @@ class OpenAILLM(LLMInterface):
                     logger.error(f"All {retries + 1} attempts failed with error: {str(e)}")
                     raise
 
-    async def _call_api(self, params: Dict[str, Any]) -> str:
+    async def _call_api(self, params: Dict[str, Any], return_message_dict: bool = False) -> Union[str, Dict[str, Any]]:
         """Make the actual API call"""
         # Use asyncio to run the blocking API call in a thread pool
         loop = asyncio.get_event_loop()
@@ -205,12 +218,24 @@ class OpenAILLM(LLMInterface):
                 logger.debug("API response reasoning_details: %s", rd)
 
             content = getattr(message, "content", None)
+            result = {
+                "content": content or "",
+                "reasoning_details": rd,
+            }
+
             # If content is empty/None, dump full response repr for debugging to a debug folder
             if not content:
                 try:
                     import os, time, uuid
 
-                    debug_dir = os.path.join(os.getcwd(), "examples", "cap_set_example", "openevolve_output", "db", "llm_response_debug")
+                    debug_dir = os.path.join(
+                        os.getcwd(),
+                        "examples",
+                        "cap_set_example",
+                        "openevolve_output",
+                        "db",
+                        "llm_response_debug",
+                    )
                     os.makedirs(debug_dir, exist_ok=True)
                     fname = f"response_debug_{int(time.time())}_{uuid.uuid4().hex}.repr.txt"
                     fpath = os.path.join(debug_dir, fname)
@@ -233,11 +258,19 @@ class OpenAILLM(LLMInterface):
                 except Exception:
                     logger.debug("Failed to write response debug file")
 
-            return content or ""
+            # Default: return string for backward compatibility
+            if return_message_dict:
+                return result
+            return result["content"]
         except Exception:
             # Fallback: try to return raw text if structure differs
             logger.debug("API response (raw): %s", response)
             try:
-                return str(response)
+                raw = str(response)
+                if return_message_dict:
+                    return {"content": raw, "reasoning_details": None}
+                return raw
             except Exception:
+                if return_message_dict:
+                    return {"content": "", "reasoning_details": None}
                 return ""
