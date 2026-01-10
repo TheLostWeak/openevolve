@@ -4,8 +4,7 @@
 Usage:
   python export_all.py --output <openevolve_output_dir>
 
-python export_all.py --output ..\openevolve_output
-E:\课程资料\机器学习\大作业\openevolve\examples\cap_set_example\openevolve_output
+python export_all.py --output examples\cap_set_example\openevolve_output
 
 Creates per-iteration directories under <output>/iteration_exports/iter{n} containing:
   - prompt.txt        (System / User separated, unescaped newlines)
@@ -84,6 +83,72 @@ def pick_response_text(entry: Dict[str, Any]) -> str:
         return str(entry.get('provider_repr'))
     # fallback: dump JSON
     return json.dumps(entry, ensure_ascii=False, indent=2)
+
+
+def extract_meta_prompt_request(entry: Dict[str, Any]) -> Optional[str]:
+    """Extract meta-prompt API request (user_msg sent to LLM for generating meta-prompt)."""
+    for key in ('meta_prompt_request', 'meta_prompt_user_msg', 'meta_prompt_input', 'meta_prompt_api_request'):
+        if key in entry and entry[key]:
+            val = entry[key]
+            if isinstance(val, (list, dict)):
+                return json.dumps(val, ensure_ascii=False, indent=2)
+            return str(val)
+    return None
+
+
+def extract_meta_prompt_response(entry: Dict[str, Any]) -> Optional[str]:
+    """Extract meta-prompt API response (LLM's returned prompt template)."""
+    for key in ('meta_prompt_response', 'meta_prompt_output', 'meta_prompt_template', 'meta_prompt_api_response'):
+        if key in entry and entry[key]:
+            val = entry[key]
+            if isinstance(val, (list, dict)):
+                return json.dumps(val, ensure_ascii=False, indent=2)
+            return str(val)
+    return None
+
+
+def _fix_mojibake(text: str) -> str:
+    """Attempt to repair common UTF-8-as-latin1 mojibake sequences."""
+    if not text or not isinstance(text, str):
+        return text
+    try:
+        recoded = text.encode('latin1', errors='ignore').decode('utf-8', errors='ignore')
+        return recoded if recoded else text
+    except Exception:
+        pass
+    return text
+
+
+def find_latest_log(op_output_dir: str) -> Optional[str]:
+    """Find latest openevolve log file under <output>/logs."""
+    logs_dir = os.path.join(op_output_dir, 'logs')
+    try:
+        candidates = glob.glob(os.path.join(logs_dir, 'openevolve_*.log'))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: os.path.getmtime(p))
+        return candidates[-1]
+    except Exception:
+        return None
+
+
+def parse_meta_prompts_from_log(log_path: str) -> Tuple[List[str], List[str]]:
+    """Return lists of meta prompt requests and responses parsed from the log.
+    Index 0 corresponds to iteration 0, index 1 to iteration 1, etc., by occurrence order.
+    """
+    reqs: List[str] = []
+    resps: List[str] = []
+    try:
+        with open(log_path, 'r', encoding='utf-8') as lf:
+            text = lf.read()
+        # Requests: capture content until next timestamp line
+        req_pattern = re.compile(r"Meta-prompt API request \(user_msg\):\s*\n([\s\S]*?)(?=\n\d{4}-\d{2}-\d{2}\s)", re.M)
+        resp_pattern = re.compile(r"Meta-prompt API response \(prompt template\):\s*\n([\s\S]*?)(?=\n\d{4}-\d{2}-\d{2}\s)", re.M)
+        reqs = [m.group(1).strip() for m in req_pattern.finditer(text)]
+        resps = [m.group(1).strip() for m in resp_pattern.finditer(text)]
+    except Exception:
+        pass
+    return reqs, resps
 
 
 def explain_response(entry: Dict[str, Any], response_text: Optional[str]) -> str:
@@ -422,9 +487,34 @@ def main():
             except Exception:
                 pass
 
-        
+        # write meta-prompt request/response (from DB or fallback to logs)
+        try:
+            meta_req = extract_meta_prompt_request(entry if isinstance(entry, dict) else {})
+            meta_resp = extract_meta_prompt_response(entry if isinstance(entry, dict) else {})
+            if (not meta_req) or (not meta_resp):
+                log_path = find_latest_log(out_base)
+                if log_path:
+                    reqs, resps = parse_meta_prompts_from_log(log_path)
+                    idx = it
+                    if idx is not None and isinstance(idx, int):
+                        if not meta_req and idx < len(reqs):
+                            meta_req = reqs[idx]
+                        if not meta_resp and idx < len(resps):
+                            meta_resp = resps[idx]
 
-        # write full metrics JSON if we discovered a metrics dict earlier
+            if meta_req:
+                meta_req_path = os.path.join(iter_dir, 'meta_prompt_request.txt')
+                safe_req = _fix_mojibake(str(meta_req))
+                with open(meta_req_path, 'w', encoding='utf-8') as mf:
+                    mf.write(safe_req.rstrip() + '\n')
+
+            if meta_resp:
+                meta_resp_path = os.path.join(iter_dir, 'meta_prompt_response.txt')
+                safe_resp = _fix_mojibake(str(meta_resp))
+                with open(meta_resp_path, 'w', encoding='utf-8') as mf:
+                    mf.write(safe_resp.rstrip() + '\n')
+        except Exception:
+            pass
         metrics_path = None
         try:
             if isinstance(full_metrics, dict) and full_metrics:

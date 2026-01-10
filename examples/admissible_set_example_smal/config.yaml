@@ -5,17 +5,26 @@ llm:
     # - name: "openai/gpt-5.1-codex-max"
     # - name: "deepseek/deepseek-v3.2-speciale"
     # - name: "meta-llama/llama-3.1-405b-instruct:free"
-    - name: "google/gemini-3-flash-preview"
-    # - name: "qwen/qwen3-coder:free"
+    - name: "qwen/qwen3-coder:free"
       weight: 1.0
 
 database:
-  db_path: "examples/cap_set_example/openevolve_output/db"
+  db_path: "examples/admissible_set_7_5/openevolve_output/db"
   log_prompts: true
   feature_dimensions:
     - "combined_score"
   population_size: 200
   num_islands: 3
+
+evaluator:
+  timeout: 600
+  max_retries: 1
+  cascade_evaluation: false
+
+prompt:
+  template_dir: "examples/admissible_set_7_5/templates"
+  num_top_programs: 2
+  num_diverse_programs: 1
 
 diff_based_evolution: false
 
@@ -27,23 +36,10 @@ evolution_trace:
   include_prompts: true
   include_code: false
   format: jsonl
-  output_path: "examples/cap_set_example/openevolve_trace.jsonl"
+  output_path: "examples/admissible_set_7_5/openevolve_trace.jsonl"
   buffer_size: 10
 
 max_code_length: 60000
 
 evaluator:
   timeout: 900
-  max_retries: 1
-  cascade_evaluation: false
-
-prompt:
-  template_dir: "examples/cap_set_example/templates"
-  num_top_programs: 3
-  num_diverse_programs: 2
-  use_meta_prompting: true
-  meta_prompt_weight: 0.1
-  meta_prompt_population_size: 50
-  meta_prompt_archive_size: 10
-  meta_prompt_mutation_rate: 0.3
-  meta_prompt_max_chars: 8000

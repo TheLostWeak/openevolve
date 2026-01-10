@@ -143,11 +143,16 @@ class OpenEvolve:
 
         self.meta_prompt_db = None
         if self.config.prompt.use_meta_prompting:
+            # Initialize current template key based on evolution mode
+            init_user_template_key = (
+                "diff_user" if self.config.diff_based_evolution else "full_rewrite_user"
+            )
             self.meta_prompt_db = MetaPromptDatabase(
                 config=self.config.prompt,
                 llm_ensemble=self.llm_ensemble,
                 language=self.config.language,
                 system_message=self.config.prompt.system_message,
+                initial_user_template_key=init_user_template_key,
             )
 
         # Pass random seed to database if specified
@@ -205,7 +210,8 @@ class OpenEvolve:
 
         # Add file handler
         log_file = os.path.join(log_dir, f"openevolve_{time.strftime('%Y%m%d_%H%M%S')}.log")
-        file_handler = logging.FileHandler(log_file)
+        # Force UTF-8 to avoid mojibake for math symbols (e.g., 𝔽₃ⁿ) in logs
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         )

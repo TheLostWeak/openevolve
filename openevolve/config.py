@@ -284,6 +284,7 @@ class PromptConfig:
     meta_prompt_archive_size: int = 10
     meta_prompt_mutation_rate: float = 0.3
     meta_prompt_max_chars: int = 800
+    meta_prompt_history_size: int = 5
 
     # Artifact rendering
     include_artifacts: bool = True

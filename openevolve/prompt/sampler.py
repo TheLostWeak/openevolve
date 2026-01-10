@@ -63,6 +63,7 @@ class PromptSampler:
         program_artifacts: Optional[Dict[str, Union[str, bytes]]] = None,
         feature_dimensions: Optional[List[str]] = None,
         meta_prompt: Optional[str] = None,
+        user_template_body_override: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, str]:
         """
@@ -97,8 +98,11 @@ class PromptSampler:
             # Default behavior: diff-based vs full rewrite
             user_template_key = "diff_user" if diff_based_evolution else "full_rewrite_user"
 
-        # Get the template
-        user_template = self.template_manager.get_template(user_template_key)
+        # Get the template (allow override by full body)
+        if user_template_body_override:
+            user_template = user_template_body_override
+        else:
+            user_template = self.template_manager.get_template(user_template_key)
 
         # Use system template override if set
         if self.system_template_override:
@@ -151,7 +155,7 @@ class PromptSampler:
             **kwargs,
         )
 
-        if meta_prompt:
+        if meta_prompt and not user_template_body_override:
             meta_prompt = meta_prompt.strip()
             if meta_prompt:
                 user_message = f"Additional instructions:\n{meta_prompt}\n\n{user_message}"

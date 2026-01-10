@@ -1,19 +1,29 @@
 # TASK SPECIFICATION
 
-Produce a **complete, runnable Python module** that constructs a large **cap set** in F_3^n.
+Produce a complete, runnable Python module that constructs a large (n,w)-admissible set A in 𝔽₃ⁿ
+following the definition below: 
+
+1. Constant weight: every vector v ∈ A must satisfy `len(v) == n`, entries in {0,1,2}, and
+	 `sum(1 for x in v if x != 0) == w`.
+
+2. Unique supports: for any two distinct vectors u ≠ v in A, their supports (indices with nonzero
+	 entries) must be different.
+
+3. Triple existence: for every triple of *distinct* vectors (a, b, c) from A there must exist
+	 at least one coordinate i where the multiset {a_i, b_i, c_i} (sorted) equals one of:
+	 - [0, 0, 1]
+	 - [0, 0, 2]
+	 - [0, 1, 2]
 
 Important: reproducibility is required. The module must use a module-level `_RANDOM_SEED` and seed all internal randomness from it.
-Note: use ASCII-only notation in all text and code. Avoid Unicode math symbols (e.g., use `F_3^n` instead of 𝔽₃ⁿ; write "subset of" instead of "⊆"; use `== 0 (mod 3)` instead of "≡ 0").
 
 ---
 
 ## 1. Goal
 
-Maximize |A| for a cap set A subset of F_3^n (no nontrivial x + y + z == 0 (mod 3)), returning a list of n-length tuples.
+Maximize |A| for an admissible set A of length-n vectors over {0,1,2} where each vector has exactly w nonzero entries.
 
-In this task, the evaluator will call **`generate_set(8)` exactly once** (i.e. n = 8).
-
-The current state-of-the-art result is 512, and our goal is to surpass it.
+The evaluator will call `generate_A(8, 4)` exactly once.
 
 ---
 
@@ -54,22 +64,18 @@ Determinism (REASSERTED):
 
 ---
 
-## 5. Output Format
+## 5. Implementation Requirements
 
 Your module must define:
 
 ```python
-def generate_set(n: int) -> List[Tuple[int, ...]]:
-````
+def generate_A(n: int, w: int) -> List[List[int]]:
+```
 
 You may optionally structure code as:
 
 ```python
-class CapSetBuilder:
-    def __init__(self, params, seed):
-        ...
-    def build(self) -> List[Tuple[int, ...]]:
-        ...
+class GreedyAdmissibleGenerator:
 ```
 
 Return only the full Python module source as your reply.

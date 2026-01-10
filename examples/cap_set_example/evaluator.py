@@ -104,6 +104,11 @@ try:
             return [conv(x) for x in o]
         if isinstance(o, list):
             return [conv(x) for x in o]
+        # Attempt to cast numpy scalar types or other numeric types to Python ints
+        try:
+            return int(o)
+        except Exception:
+            pass
         return o
     out = {{'success': True, 'result': conv(res)}}
     print(json.dumps(out))

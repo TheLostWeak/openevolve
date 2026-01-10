@@ -140,6 +140,7 @@ def _run_iteration_worker(
     inspiration_ids: List[str],
     meta_prompt_text: Optional[str] = None,
     meta_prompt_id: Optional[str] = None,
+    current_template_body: Optional[str] = None,
 ) -> SerializableResult:
     """Run a single iteration in a worker process"""
     try:
@@ -189,6 +190,7 @@ def _run_iteration_worker(
             program_artifacts=parent_artifacts,
             feature_dimensions=db_snapshot.get("feature_dimensions", []),
             meta_prompt=meta_prompt_text,
+            user_template_body_override=current_template_body,
         )
         logger.info(
             "Iteration %s prompt (system then user):\n%s\n\n%s",
@@ -932,6 +934,8 @@ class ProcessParallelController:
                 )
                 meta_prompt_text = meta_prompt.text
                 meta_prompt_id = meta_prompt.id
+                # Current template body for this iteration is the newly sampled meta-prompt text
+                current_template_body = self.meta_prompt_db.current_user_template_body
 
             # Submit to process pool
             future = self.executor.submit(
@@ -942,6 +946,7 @@ class ProcessParallelController:
                 [insp.id for insp in inspirations],
                 meta_prompt_text,
                 meta_prompt_id,
+                current_template_body,
             )
 
             return future
