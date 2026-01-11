@@ -1,0 +1,91 @@
+# Evolution settings
+max_iterations: 200
+checkpoint_interval: 10
+parallel_evaluations: 1
+
+# LLM configuration
+llm:
+  api_base: "https://openrouter.ai/api/v1"
+  models:
+    # - name: "openai/gpt-5.2"
+    # - name: "openai/gpt-5.1-codex-max"
+    # - name: "deepseek/deepseek-v3.2-speciale"
+    # - name: "meta-llama/llama-3.1-405b-instruct:free"
+    # - name: "qwen/qwen3-coder:free"
+    - name: "google/gemini-3-flash-preview"
+      weight: 1.0
+      extra_body:
+        reasoning:
+          enabled: true
+
+# Database configuration (MAP-Elites algorithm)
+database:
+  db_path: "examples/alphaevolve_math_problems/erdos_min_overlap/openevolve_output/db"
+  log_prompts: true
+  population_size: 100
+  num_islands: 5
+  migration_interval: 40
+  feature_dimensions:  # MUST be a list, not an integer
+    - "score"
+    - "complexity"
+  feature_bins:
+    score: 30
+    complexity: 10
+    diversity: 10
+  feature_scaling_method: "percentile"
+  score_feature_transform: "baseline_ratio"
+  score_feature_baseline: 0.38092303510845016
+
+max_code_length: 60000
+
+# Evaluation settings
+evaluator:
+  timeout: 900
+  max_retries: 3
+  cascade_evaluation: false
+
+# Prompt configuration
+prompt:
+  system_message: |
+    ROLE:
+    You are an expert in harmonic analysis, numerical optimization, and algorithmic search.
+    Evolve a Python program to find a tighter upper bound for the Erdos minimum overlap
+    constant C5 by minimizing the discrete approximation of:
+      max_k integral h(x) * (1 - h(x + k)) dx
+
+    TARGET:
+    Current best bound: C5 <= 0.38092303510845016
+    Goal: produce a smaller c5_bound.
+
+    WHAT THE PROGRAM MUST DO:
+    - Implement run() that returns (h_values, c5_bound, n_points).
+    - h_values is a 1D numpy array of length n_points representing a step function h on [0, 2].
+    - c5_bound is the maximum overlap computed from h_values.
+    - n_points is the discretization size used to define h_values.
+
+    HARD CONSTRAINTS:
+    1) 0 <= h_values[i] <= 1 for all i.
+    2) Integral constraint: sum(h_values) * (2 / n_points) == 1 within 1e-3.
+
+    SCORING (maximize):
+    combined_score = 0.38092303510845016 / c5_bound
+    A value > 1 means a new record.
+
+    OPTIMIZATION HINTS:
+    - Improve the structure of h (piecewise-constant steps, symmetry, or heuristic search).
+    - Keep the computation efficient; evaluators time your run().
+    - Prefer deterministic results unless randomness clearly helps and is controlled.
+    - If using JAX/Optax: always call optimizer.update(grads, opt_state, params) with params passed in.
+      When using optax.adam/adamw or any transform requiring params, do NOT omit the params argument.
+  use_meta_prompting: true
+  meta_prompt_db_path: "examples/alphaevolve_math_problems/erdos_min_overlap/openevolve_output/meta_db/meta_prompts.json"
+  meta_prompt_weight: 1.0
+  meta_prompt_update_every: 1
+  meta_prompt_use_softmax: true
+  meta_prompt_temperature: 0.5
+  meta_prompt_max_chars: 8000
+  num_top_programs: 3
+  num_diverse_programs: 2
+
+# Logging
+log_level: "INFO"

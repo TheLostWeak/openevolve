@@ -1,0 +1,521 @@
+"""
+Configuration handling for OpenEvolve
+"""
+
+import os
+import re
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+
+import dacite
+import yaml
+
+if TYPE_CHECKING:
+    from openevolve.llm.base import LLMInterface
+
+
+_ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")  # ${VAR}
+
+
+def _load_dotenv(dotenv_path: Optional[Union[str, Path]] = None) -> None:
+    """Load key/value pairs from a .env file into os.environ if not already set."""
+    path = Path(dotenv_path) if dotenv_path else Path(".env")
+    if not path.is_file():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+def _resolve_env_var(value: Optional[str]) -> Optional[str]:
+    """
+    Resolve ${VAR} environment variable reference in a string value.
+    In current implementation pattern must match the entire string (e.g., "${OPENAI_API_KEY}"),
+    not embedded within other text.
+
+    Args:
+        value: The string value that may contain ${VAR} syntax
+
+    Returns:
+        The resolved value with environment variable expanded, or original value if no match
+
+    Raises:
+        ValueError: If the environment variable is referenced but not set
+    """
+    if value is None:
+        return None
+
+    match = _ENV_VAR_PATTERN.match(value)
+    if not match:
+        return value
+
+    var_name = match.group(1)
+    env_value = os.environ.get(var_name)
+    if env_value is None:
+        raise ValueError(f"Environment variable {var_name} is not set")
+    return env_value
+
+
+@dataclass
+class LLMModelConfig:
+    """Configuration for a single LLM model"""
+
+    # API configuration
+    api_base: str = None
+    api_key: Optional[str] = None
+    name: str = None
+
+    # Custom LLM client
+    init_client: Optional[Callable] = None
+
+    # Weight for model in ensemble
+    weight: float = 1.0
+
+    # Generation parameters
+    system_message: Optional[str] = None
+    temperature: float = None
+    top_p: float = None
+    max_tokens: int = None
+
+    # Request parameters
+    timeout: int = None
+    retries: int = None
+    retry_delay: int = None
+
+    # Provider-specific extra request body (e.g., OpenRouter reasoning)
+    extra_body: Optional[Dict[str, Any]] = None
+
+    # Reproducibility
+    random_seed: Optional[int] = None
+
+    # Reasoning parameters
+    reasoning_effort: Optional[str] = None
+
+    def __post_init__(self):
+        """Post-initialization to resolve ${VAR} env var references in api_key"""
+        self.api_key = _resolve_env_var(self.api_key)
+
+
+@dataclass
+class LLMConfig(LLMModelConfig):
+    """Configuration for LLM models"""
+
+    # API configuration
+    api_base: str = "https://api.openai.com/v1"
+
+    # Generation parameters
+    system_message: Optional[str] = "system_message"
+    temperature: float = 0.7
+    top_p: float = 0.95
+    max_tokens: Optional[int] = None
+
+    # Request parameters
+    timeout: int = 3600
+    retries: int = 3
+    retry_delay: int = 5
+
+    # n-model configuration for evolution LLM ensemble
+    models: List[LLMModelConfig] = field(default_factory=list)
+
+    # n-model configuration for evaluator LLM ensemble
+    evaluator_models: List[LLMModelConfig] = field(default_factory=lambda: [])
+
+    # Backwardes compatibility with primary_model(_weight) options
+    primary_model: str = None
+    primary_model_weight: float = None
+    secondary_model: str = None
+    secondary_model_weight: float = None
+
+    # Reasoning parameters (inherited from LLMModelConfig but can be overridden)
+    reasoning_effort: Optional[str] = None
+
+    def __post_init__(self):
+        """Post-initialization to set up model configurations"""
+        super().__post_init__()  # Resolve ${VAR} in api_key at LLMConfig level
+
+        # Handle backward compatibility for primary_model(_weight) and secondary_model(_weight).
+        if self.primary_model:
+            # Create primary model
+            primary_model = LLMModelConfig(
+                name=self.primary_model, weight=self.primary_model_weight or 1.0
+            )
+            self.models.append(primary_model)
+
+        if self.secondary_model:
+            # Create secondary model (only if weight > 0)
+            if self.secondary_model_weight is None or self.secondary_model_weight > 0:
+                secondary_model = LLMModelConfig(
+                    name=self.secondary_model,
+                    weight=(
+                        self.secondary_model_weight
+                        if self.secondary_model_weight is not None
+                        else 0.2
+                    ),
+                )
+                self.models.append(secondary_model)
+
+        # Only validate if this looks like a user config (has some model info)
+        # Don't validate during internal/default initialization
+        if (
+            self.primary_model
+            or self.secondary_model
+            or self.primary_model_weight
+            or self.secondary_model_weight
+        ) and not self.models:
+            raise ValueError(
+                "No LLM models configured. Please specify 'models' array or "
+                "'primary_model' in your configuration."
+            )
+
+        # If no evaluator models are defined, use the same models as for evolution
+        if not self.evaluator_models:
+            self.evaluator_models = self.models.copy()
+
+        # Update models with shared configuration values
+        shared_config = {
+            "api_base": self.api_base,
+            "api_key": self.api_key,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_tokens": self.max_tokens,
+            "timeout": self.timeout,
+            "retries": self.retries,
+            "retry_delay": self.retry_delay,
+            "random_seed": self.random_seed,
+            "reasoning_effort": self.reasoning_effort,
+        }
+        self.update_model_params(shared_config)
+
+    def update_model_params(self, args: Dict[str, Any], overwrite: bool = False) -> None:
+        """Update model parameters for all models"""
+        for model in self.models + self.evaluator_models:
+            for key, value in args.items():
+                if overwrite or getattr(model, key, None) is None:
+                    setattr(model, key, value)
+
+    def rebuild_models(self) -> None:
+        """Rebuild the models list after primary_model/secondary_model field changes"""
+        # Clear existing models lists
+        self.models = []
+        self.evaluator_models = []
+
+        # Re-run model generation logic from __post_init__
+        if self.primary_model:
+            # Create primary model
+            primary_model = LLMModelConfig(
+                name=self.primary_model, weight=self.primary_model_weight or 1.0
+            )
+            self.models.append(primary_model)
+
+        if self.secondary_model:
+            # Create secondary model (only if weight > 0)
+            if self.secondary_model_weight is None or self.secondary_model_weight > 0:
+                secondary_model = LLMModelConfig(
+                    name=self.secondary_model,
+                    weight=(
+                        self.secondary_model_weight
+                        if self.secondary_model_weight is not None
+                        else 0.2
+                    ),
+                )
+                self.models.append(secondary_model)
+
+        # If no evaluator models are defined, use the same models as for evolution
+        if not self.evaluator_models:
+            self.evaluator_models = self.models.copy()
+
+        # Update models with shared configuration values
+        shared_config = {
+            "api_base": self.api_base,
+            "api_key": self.api_key,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_tokens": self.max_tokens,
+            "timeout": self.timeout,
+            "retries": self.retries,
+            "retry_delay": self.retry_delay,
+            "random_seed": self.random_seed,
+            "reasoning_effort": self.reasoning_effort,
+        }
+        self.update_model_params(shared_config)
+
+
+@dataclass
+class PromptConfig:
+    """Configuration for prompt generation"""
+
+    template_dir: Optional[str] = None
+    system_message: str = "system_message"
+    evaluator_system_message: str = "evaluator_system_message"
+
+    # Number of examples to include in the prompt
+    num_top_programs: int = 3
+    num_diverse_programs: int = 2
+
+    # Template stochasticity
+    use_template_stochasticity: bool = True
+    template_variations: Dict[str, List[str]] = field(default_factory=dict)
+
+    # Meta-prompting
+    use_meta_prompting: bool = False
+    meta_prompt_weight: float = 0.1
+    meta_prompt_db_path: Optional[str] = None
+    meta_prompt_max_entries: int = 50
+    meta_prompt_max_chars: int = 600
+    meta_prompt_update_every: int = 1
+    meta_prompt_use_softmax: bool = False
+    meta_prompt_temperature: float = 1.0
+
+    # Artifact rendering
+    include_artifacts: bool = True
+    max_artifact_bytes: int = 20 * 1024  # 20KB in prompt
+    artifact_security_filter: bool = True
+
+    # Feature extraction and program labeling
+    suggest_simplification_after_chars: Optional[int] = None
+    include_changes_under_chars: Optional[int] = None
+    concise_implementation_max_lines: Optional[int] = None
+    comprehensive_implementation_min_lines: Optional[int] = None
+
+    # Backward compatibility - deprecated
+    code_length_threshold: Optional[int] = (
+        None  # Deprecated: use suggest_simplification_after_chars
+    )
+
+
+@dataclass
+class DatabaseConfig:
+    """Configuration for the program database"""
+
+    # General settings
+    db_path: Optional[str] = None  # Path to store database on disk
+    in_memory: bool = True
+
+    # Prompt and response logging to programs/<id>.json
+    log_prompts: bool = True
+
+    # Evolutionary parameters
+    population_size: int = 1000
+    archive_size: int = 100
+    num_islands: int = 5
+
+    # Selection parameters
+    elite_selection_ratio: float = 0.1
+    exploration_ratio: float = 0.2
+    exploitation_ratio: float = 0.7
+    # Note: diversity_metric fixed to "edit_distance"
+    diversity_metric: str = "edit_distance"  # Options: "edit_distance", "feature_based"
+
+    # Feature map dimensions for MAP-Elites
+    # Default to complexity and diversity for better exploration
+    # CRITICAL: For custom dimensions, evaluators must return RAW VALUES, not bin indices
+    # Built-in: "complexity", "diversity", "score" (always available)
+    # Custom: Any metric from your evaluator (must be continuous values)
+    feature_dimensions: List[str] = field(
+        default_factory=lambda: ["complexity", "diversity"],
+        metadata={
+            "help": "List of feature dimensions for MAP-Elites grid. "
+            "Built-in dimensions: 'complexity', 'diversity', 'score'. "
+            "Custom dimensions: Must match metric names from evaluator. "
+            "IMPORTANT: Evaluators must return raw continuous values for custom dimensions, "
+            "NOT pre-computed bin indices. OpenEvolve handles all scaling and binning internally."
+        },
+    )
+    feature_bins: Union[int, Dict[str, int]] = 10  # Can be int (all dims) or dict (per-dim)
+    diversity_reference_size: int = 20  # Size of reference set for diversity calculation
+    feature_scaling_method: str = "minmax"  # Options: minmax, zscore, percentile
+    score_feature_transform: Optional[str] = None  # baseline_ratio, neg_log, inverse
+    score_feature_baseline: Optional[float] = None
+
+    # Migration parameters for island-based evolution
+    migration_interval: int = 50  # Migrate every N generations
+    migration_rate: float = 0.1  # Fraction of population to migrate
+
+    # Random seed for reproducible sampling
+    random_seed: Optional[int] = 42
+
+    # Artifact storage
+    artifacts_base_path: Optional[str] = None  # Defaults to db_path/artifacts
+    artifact_size_threshold: int = 32 * 1024  # 32KB threshold
+    cleanup_old_artifacts: bool = True
+    artifact_retention_days: int = 30
+
+    novelty_llm: Optional["LLMInterface"] = None
+    embedding_model: Optional[str] = None
+    similarity_threshold: float = 0.99
+
+
+@dataclass
+class EvaluatorConfig:
+    """Configuration for program evaluation"""
+
+    # General settings
+    timeout: int = 300  # Maximum evaluation time in seconds
+    max_retries: int = 3
+
+    # Resource limits for evaluation
+    # Note: resource limits not implemented
+    memory_limit_mb: Optional[int] = None
+    cpu_limit: Optional[float] = None
+
+    # Evaluation strategies
+    cascade_evaluation: bool = True
+    cascade_thresholds: List[float] = field(default_factory=lambda: [0.5, 0.75, 0.9])
+
+    # Parallel evaluation
+    parallel_evaluations: int = 1
+    # Note: distributed evaluation not implemented
+    distributed: bool = False
+
+    # LLM-based feedback
+    use_llm_feedback: bool = False
+    llm_feedback_weight: float = 0.1
+
+    # Artifact handling
+    enable_artifacts: bool = True
+    max_artifact_storage: int = 100 * 1024 * 1024  # 100MB per program
+
+
+@dataclass
+class EvolutionTraceConfig:
+    """Configuration for evolution trace logging"""
+
+    enabled: bool = False
+    format: str = "jsonl"  # Options: "jsonl", "json", "hdf5"
+    include_code: bool = False
+    include_prompts: bool = True
+    output_path: Optional[str] = None
+    buffer_size: int = 10
+    compress: bool = False
+
+
+@dataclass
+class Config:
+    """Master configuration for OpenEvolve"""
+
+    # General settings
+    max_iterations: int = 10000
+    checkpoint_interval: int = 100
+    log_level: str = "INFO"
+    log_dir: Optional[str] = None
+    random_seed: Optional[int] = 42
+    language: str = None
+    file_suffix: str = ".py"
+
+    # Component configurations
+    llm: LLMConfig = field(default_factory=LLMConfig)
+    prompt: PromptConfig = field(default_factory=PromptConfig)
+    database: DatabaseConfig = field(default_factory=DatabaseConfig)
+    evaluator: EvaluatorConfig = field(default_factory=EvaluatorConfig)
+    evolution_trace: EvolutionTraceConfig = field(default_factory=EvolutionTraceConfig)
+
+    # Evolution settings
+    diff_based_evolution: bool = True
+    max_code_length: int = 60000
+    diff_pattern: str = r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
+
+    # Early stopping settings
+    early_stopping_patience: Optional[int] = None
+    convergence_threshold: float = 0.001
+    early_stopping_metric: str = "combined_score"
+
+    # Parallel controller settings
+    max_tasks_per_child: Optional[int] = None
+
+    @classmethod
+    def from_yaml(cls, path: Union[str, Path]) -> "Config":
+        """Load configuration from a YAML file"""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                config_dict = yaml.safe_load(f)
+        except UnicodeDecodeError:
+            # Fallback for non-UTF8 files on Windows locales.
+            with open(path, "r", encoding="gbk", errors="replace") as f:
+                config_dict = yaml.safe_load(f)
+        return cls.from_dict(config_dict)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":
+        """Create configuration from a dictionary"""
+        # Handle nested configurations
+        config = Config()
+
+        # Update top-level fields
+        for key, value in config_dict.items():
+            if key not in ["llm", "prompt", "database", "evaluator", "evolution_trace"] and hasattr(
+                config, key
+            ):
+                setattr(config, key, value)
+
+        # Update nested configs
+        if "llm" in config_dict:
+            llm_dict = config_dict["llm"]
+            if "models" in llm_dict:
+                llm_dict["models"] = [LLMModelConfig(**m) for m in llm_dict["models"]]
+            if "evaluator_models" in llm_dict:
+                llm_dict["evaluator_models"] = [
+                    LLMModelConfig(**m) for m in llm_dict["evaluator_models"]
+                ]
+            config.llm = LLMConfig(**llm_dict)
+        if "prompt" in config_dict:
+            config.prompt = PromptConfig(**config_dict["prompt"])
+        if "database" in config_dict:
+            config.database = DatabaseConfig(**config_dict["database"])
+
+        # Ensure database inherits the random seed if not explicitly set
+        if config.database.random_seed is None and config.random_seed is not None:
+            config.database.random_seed = config.random_seed
+        if "evaluator" in config_dict:
+            config.evaluator = EvaluatorConfig(**config_dict["evaluator"])
+        if "evolution_trace" in config_dict:
+            config.evolution_trace = EvolutionTraceConfig(**config_dict["evolution_trace"])
+        if "diff_pattern" in config_dict:
+            # Validate it's a valid regex
+            try:
+                re.compile(config_dict["diff_pattern"])
+            except re.error as e:
+                raise ValueError(f"Invalid regex pattern in diff_pattern: {e}")
+            config.diff_pattern = config_dict["diff_pattern"]
+
+        return config
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    def to_yaml(self, path: Union[str, Path]) -> None:
+        """Save configuration to a YAML file"""
+        with open(path, "w") as f:
+            yaml.dump(self.to_dict(), f, default_flow_style=False)
+
+
+def load_config(config_path: Optional[Union[str, Path]] = None) -> Config:
+    """Load configuration from a YAML file or use defaults"""
+    _load_dotenv()
+    if config_path and os.path.exists(config_path):
+        config = Config.from_yaml(config_path)
+    else:
+        config = Config()
+
+        # Use environment variables if available
+        api_key = os.environ.get("OPENAI_API_KEY")
+        api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+
+        config.llm.update_model_params({"api_key": api_key, "api_base": api_base})
+
+    # Make the system message available to the individual models, in case it is not provided from the prompt sampler
+    config.llm.update_model_params({"system_message": config.prompt.system_message})
+
+    return config

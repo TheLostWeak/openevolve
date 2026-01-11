@@ -1,0 +1,65 @@
+results/
+examples/lm_eval/prompts/system_message.txt
+examples/lm_eval/prompts/evaluator_system_message.txt
+examples/cap_set_example/openevolve_trace.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Output files
+examples/*/output/
+openevolve_output*/
+examples/*/exports/
+*.log
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+.DS_Store
+.venv
+
+# For SR
+secrets.yaml
+problems
+
+.env
+tmp.py
+performance_curve.png
+examples/alphaevolve_math_problems/erdos_min_overlap/exports/
+AlphaEvolve.pdf
+examples/alphaevolve_math_problems/erdos_min_overlap/parse_openevolve_output.py
+modifications.diff
